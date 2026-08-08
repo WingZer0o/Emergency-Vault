@@ -178,6 +178,29 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("AuthSystem.Domain.Entities.UserFailedLogin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AttemptedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("AttemptedByIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserFailedLogins", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -292,6 +315,17 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("AuthSystem.Domain.Entities.UserFailedLogin", b =>
+                {
+                    b.HasOne("AuthSystem.Domain.Entities.ApplicationUser", "User")
+                        .WithMany("FailedLogins")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("AuthSystem.Domain.Entities.ApplicationRole", null)
@@ -345,6 +379,8 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("AuthSystem.Domain.Entities.ApplicationUser", b =>
                 {
+                    b.Navigation("FailedLogins");
+
                     b.Navigation("RefreshTokens");
                 });
 #pragma warning restore 612, 618

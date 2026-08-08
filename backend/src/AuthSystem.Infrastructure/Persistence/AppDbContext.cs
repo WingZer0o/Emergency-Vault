@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
 {
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<UserFailedLogin> UserFailedLogins => Set<UserFailedLogin>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -30,6 +31,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasIndex(t => t.TokenHash).IsUnique();
             e.HasOne(t => t.User)
                 .WithMany(u => u.RefreshTokens)
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<UserFailedLogin>(e =>
+        {
+            e.ToTable("UserFailedLogins");
+            e.HasKey(t => t.Id);
+            e.Property(t => t.AttemptedByIp).HasMaxLength(45);
+            e.HasOne(t => t.User)
+                .WithMany(u => u.FailedLogins)
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

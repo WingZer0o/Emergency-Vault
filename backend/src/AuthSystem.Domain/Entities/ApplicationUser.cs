@@ -14,5 +14,6 @@ public class ApplicationUser : IdentityUser<Guid>
     /// <summary>Next HOTP counter value to consume; advances by one every time a code is generated.</summary>
     public long TwoFactorCounter { get; set; }
 
-    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public virtual ICollection<UserFailedLogin> FailedLogins { get; set; } = new List<UserFailedLogin>();
 }
