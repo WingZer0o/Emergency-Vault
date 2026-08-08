@@ -47,7 +47,7 @@ public class AuthService(
         await userManager.AddToRoleAsync(user, "User");
 
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        var link = $"{_frontendOptions.BaseUrl}/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+        var link = $"{Environment.GetEnvironmentVariable("DOMAIN")}/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
         await emailSender.SendEmailConfirmationAsync(user.Email!, link, ct);
 
         return ServiceResult.Success();
@@ -157,7 +157,7 @@ public class AuthService(
         }
 
         var token = await userManager.GeneratePasswordResetTokenAsync(user);
-        var link = $"{_frontendOptions.BaseUrl}/reset-password?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+        var link = $"{Environment.GetEnvironmentVariable("DOMAIN")}/reset-password?userId={user.Id}&token={Uri.EscapeDataString(token)}";
         await emailSender.SendPasswordResetAsync(user.Email!, link, ct);
 
         return ServiceResult.Success();
