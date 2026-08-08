@@ -26,6 +26,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/confirm-email/confirm-email').then((m) => m.ConfirmEmail),
   },
   {
+    path: 'unlock-account',
+    loadComponent: () =>
+      import('./features/auth/unlock-account/unlock-account').then((m) => m.UnlockAccount),
+  },
+  {
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),

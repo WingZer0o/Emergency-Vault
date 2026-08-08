@@ -88,6 +88,10 @@ export class AuthService {
     return this.http.get<{ message: string }>(`${this.baseUrl}/confirm-email`, { params: { userId, token } });
   }
 
+  unlockAccount(userId: string, token: string): Observable<{ message: string }> {
+    return this.http.get<{ message: string }>(`${this.baseUrl}/unlock-account`, { params: { userId, token } });
+  }
+
   forgotPassword(request: ForgotPasswordRequest): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/forgot-password`, request);
   }

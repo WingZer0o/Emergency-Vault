@@ -17,6 +17,7 @@ public class AuthService(
     ITwoFactorChallengeCache twoFactorChallengeCache,
     IRefreshTokenRepository refreshTokenRepository,
     IRefreshTokenCache refreshTokenCache,
+    IUserFailedLoginRepository userFailedLoginRepository,
     IEmailSender emailSender,
     IOptions<JwtOptions> jwtOptions,
     IOptions<FrontendOptions> frontendOptions,
@@ -24,6 +25,7 @@ public class AuthService(
 {
     private const int TwoFactorCodeDigits = 6;
     private const int MaxTwoFactorAttempts = 5;
+    private const string UnlockAccountTokenPurpose = "UnlockAccount";
     private static readonly TimeSpan TwoFactorChallengeTtl = TimeSpan.FromMinutes(10);
 
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
@@ -65,6 +67,7 @@ public class AuthService(
         var user = await userManager.FindByEmailAsync(request.Email);
         if (user is null)
         {
+            await RecordFailedLoginAsync(null, request.Email, "UserNotFound", ipAddress, ct);
             return ServiceResult<LoginResult>.Failure("Invalid email or password.");
         }
 
@@ -73,9 +76,18 @@ public class AuthService(
             return ServiceResult<LoginResult>.Failure("Email has not been confirmed yet.");
         }
 
+        var wasLockedOut = await userManager.IsLockedOutAsync(user);
         var signInResult = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (!signInResult.Succeeded)
         {
+            var reason = signInResult.IsLockedOut ? "LockedOut" : "InvalidPassword";
+            await RecordFailedLoginAsync(user.Id, request.Email, reason, ipAddress, ct);
+
+            if (signInResult.IsLockedOut && !wasLockedOut)
+            {
+                await SendAccountLockedEmailAsync(user, ct);
+            }
+
             var message = signInResult.IsLockedOut
                 ? "Account is temporarily locked due to repeated failed attempts."
                 : "Invalid email or password.";
@@ -110,13 +122,28 @@ public class AuthService(
             return ServiceResult<AuthResult>.Failure("Invalid or expired code. Please log in again.");
         }
 
+        if (await userManager.IsLockedOutAsync(user))
+        {
+            await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult<AuthResult>.Failure("Account is temporarily locked due to repeated failed attempts.");
+        }
+
         var secret = Convert.FromBase64String(user.TwoFactorSecret);
         var expectedCode = hotpService.GenerateCode(secret, challenge.Counter, TwoFactorCodeDigits);
 
-        if (!CryptographicOperations.FixedTimeEquals(
-                System.Text.Encoding.UTF8.GetBytes(code),
-                System.Text.Encoding.UTF8.GetBytes(expectedCode)))
+        if (!CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(code), System.Text.Encoding.UTF8.GetBytes(expectedCode)))
         {
+            await userManager.AccessFailedAsync(user);
+            if (await userManager.IsLockedOutAsync(user))
+            {
+                await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+                await RecordFailedLoginAsync(user.Id, user.Email!, "LockedOut", ipAddress, ct);
+                await SendAccountLockedEmailAsync(user, ct);
+                return ServiceResult<AuthResult>.Failure("Account is temporarily locked due to repeated failed attempts.");
+            }
+
+            await RecordFailedLoginAsync(user.Id, user.Email!, "InvalidTwoFactorCode", ipAddress, ct);
+
             if (challenge.Attempts + 1 >= MaxTwoFactorAttempts)
             {
                 await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
@@ -129,6 +156,7 @@ public class AuthService(
         }
 
         await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+        await userManager.ResetAccessFailedCountAsync(user);
         var result = await IssueTokenPairAsync(user, ipAddress, ct);
         return ServiceResult<AuthResult>.Success(result);
     }
@@ -191,6 +219,46 @@ public class AuthService(
 
         var result = await userManager.SetTwoFactorEnabledAsync(user, false);
         return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    private async Task RecordFailedLoginAsync(Guid? userId, string email, string reason, string? ipAddress, CancellationToken ct)
+    {
+        await userFailedLoginRepository.AddAsync(new UserFailedLogin
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Email = email,
+            Reason = reason,
+            AttemptedByIp = ipAddress,
+        }, ct);
+        await userFailedLoginRepository.SaveChangesAsync(ct);
+    }
+
+    private async Task SendAccountLockedEmailAsync(ApplicationUser user, CancellationToken ct)
+    {
+        var token = await userManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, UnlockAccountTokenPurpose);
+        var link = $"{Environment.GetEnvironmentVariable("DOMAIN")}/unlock-account?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+        await emailSender.SendAccountLockedAsync(user.Email!, link, ct);
+    }
+
+    public async Task<ServiceResult> UnlockAccountAsync(Guid userId, string token, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ServiceResult.Failure("Invalid unlock link.");
+        }
+
+        var isValid = await userManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, UnlockAccountTokenPurpose, token);
+        if (!isValid)
+        {
+            return ServiceResult.Failure("Invalid or expired unlock link.");
+        }
+
+        await userManager.SetLockoutEndDateAsync(user, null);
+        await userManager.ResetAccessFailedCountAsync(user);
+
+        return ServiceResult.Success();
     }
 
     /// <summary>Advances the user's HOTP counter, generates the code for it, emails it, and persists the new counter.</summary>

@@ -39,11 +39,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             e.ToTable("UserFailedLogins");
             e.HasKey(t => t.Id);
+            e.Property(t => t.Email).HasMaxLength(256).IsRequired();
+            e.Property(t => t.Reason).HasMaxLength(64).IsRequired();
             e.Property(t => t.AttemptedByIp).HasMaxLength(45);
             e.HasOne(t => t.User)
                 .WithMany(u => u.FailedLogins)
                 .HasForeignKey(t => t.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

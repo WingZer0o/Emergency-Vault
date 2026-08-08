@@ -50,6 +50,7 @@ public static class DependencyInjection
             .AddDefaultTokenProviders();
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IUserFailedLoginRepository, UserFailedLoginRepository>();
         services.AddSingleton<IRefreshTokenCache, RedisRefreshTokenCache>();
         services.AddScoped<IEmailSender, ResendEmailSender>();
         services.AddScoped<EmailJobs>();

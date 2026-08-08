@@ -1,0 +1,21 @@
+<div class="auth-page">
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title>Unlock account</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (loading()) {
+        <div class="loading-row">
+          <mat-progress-spinner diameter="28" mode="indeterminate" />
+          <span>Unlocking your account...</span>
+        </div>
+      } @else if (successMessage(); as message) {
+        <p class="success-text">{{ message }}</p>
+        <p class="switch-link"><a routerLink="/login">Sign in</a></p>
+      } @else {
+        <p class="error-text">{{ errorMessage() }}</p>
+        <p class="switch-link"><a routerLink="/login">Back to sign in</a></p>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

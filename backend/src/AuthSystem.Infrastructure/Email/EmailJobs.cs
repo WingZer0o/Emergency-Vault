@@ -51,6 +51,20 @@ public class EmailJobs
         await SendEmailAsync(body);
     }
 
+    public async Task SendAccountLockedAsync(string toEmail, string unlockLink)
+    {
+        EmailRequestBody body = new EmailRequestBody()
+        {
+            From = "support@mtmulch.com",
+            Subject = "Your account has been locked",
+            To = new List<string> { toEmail },
+            Html = $"<p>Your account has been temporarily locked due to repeated failed sign-in attempts.</p>" +
+                   $"<p>You can unlock it now by clicking <a href='{unlockLink}'>here</a>, or wait 15 minutes and it will unlock automatically.</p>" +
+                   "<p>If this wasn't you, consider resetting your password once you're back in.</p>"
+        };
+        await SendEmailAsync(body);
+    }
+
     private async Task<bool> SendEmailAsync(EmailRequestBody body)
     {
         HttpClientSingleton httpClient = HttpClientSingleton.Instance;

@@ -26,4 +26,10 @@ public class ResendEmailSender(IBackgroundJobClient backgroundJobClient) : IEmai
         backgroundJobClient.Enqueue<EmailJobs>(job => job.SendTwoFactorCodeAsync(toEmail, code));
         return Task.CompletedTask;
     }
+
+    public Task SendAccountLockedAsync(string toEmail, string unlockLink, CancellationToken ct)
+    {
+        backgroundJobClient.Enqueue<EmailJobs>(job => job.SendAccountLockedAsync(toEmail, unlockLink));
+        return Task.CompletedTask;
+    }
 }

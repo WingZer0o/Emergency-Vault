@@ -105,6 +105,16 @@ public class AuthController(IAuthService authService) : ControllerBase
             : BadRequest(new { errors = result.Errors });
     }
 
+    [HttpGet("unlock-account")]
+    [AllowAnonymous]
+    public async Task<IActionResult> UnlockAccount([FromQuery] Guid userId, [FromQuery] string token, CancellationToken ct)
+    {
+        var result = await authService.UnlockAccountAsync(userId, token, ct);
+        return result.Succeeded
+            ? Ok(new { message = "Account unlocked. You can now log in." })
+            : BadRequest(new { errors = result.Errors });
+    }
+
     [HttpPost("forgot-password")]
     [AllowAnonymous]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken ct)
