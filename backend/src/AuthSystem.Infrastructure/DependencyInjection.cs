@@ -6,6 +6,7 @@ using AuthSystem.Infrastructure.Email;
 using AuthSystem.Infrastructure.Persistence;
 using AuthSystem.Infrastructure.Repositories;
 using AuthSystem.Infrastructure.Security;
+using Hangfire;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -50,7 +51,23 @@ public static class DependencyInjection
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddSingleton<IRefreshTokenCache, RedisRefreshTokenCache>();
-        services.AddScoped<IEmailSender, ConsoleEmailSender>();
+        services.AddScoped<IEmailSender, ResendEmailSender>();
+        services.AddScoped<EmailJobs>();
+
+        // Job queue lives in the same SQL Server database as everything else (Hangfire creates
+        // its own schema on first run). A single worker on the dedicated "emails" queue processes
+        // sends one at a time so we stay under Resend's rate limit.
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSqlServerStorage(configuration.GetConnectionString("Default")));
+
+        services.AddHangfireServer(options =>
+        {
+            options.Queues = ["emails"];
+            options.WorkerCount = 1;
+        });
 
         // ITokenService depends on the ECDsa signing key singleton, registered by the Api
         // project in Program.cs (loaded once there and shared with JWT Bearer validation).

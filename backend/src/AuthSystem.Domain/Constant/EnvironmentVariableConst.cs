@@ -7,5 +7,6 @@ namespace AuthSystem.Domain.Constant
         public const string InfisicalClientSecret = "INFISICAL_CLIENT_SECRET";
         public const string InfisicalProjectId = "INFISICAL_PROJECT_ID";
         public const string JwtSigningKeyPem = "JWT_SIGNING_KEY_PEM";
+        public const string ResendApiKey = "RESEND_API_KEY";
     }
 }
