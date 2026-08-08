@@ -34,8 +34,6 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__Default: "Server=sqlserver,1433;Database=AuthSystemDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;"
-      ConnectionStrings__Redis: "redis:6379"
       Frontend__BaseUrl: "http://localhost"
       Cors__AllowedOrigins__0: "http://localhost"
       Cors__AllowedOrigins__1: "http://localhost:4200"

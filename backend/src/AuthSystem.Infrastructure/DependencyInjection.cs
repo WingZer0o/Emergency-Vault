@@ -1,5 +1,6 @@
 using AuthSystem.Application.Interfaces;
 using AuthSystem.Application.Options;
+using AuthSystem.Domain.Constant;
 using AuthSystem.Domain.Entities;
 using AuthSystem.Infrastructure.Caching;
 using AuthSystem.Infrastructure.Email;
@@ -20,13 +21,14 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("Default")));
+            options.UseSqlServer(Environment.GetEnvironmentVariable(EnvironmentVariableConst.SqlServerConnectionString) 
+                ?? throw new InvalidOperationException("Missing ConnectionStrings:Default configuration.")));
 
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<FrontendOptions>(configuration.GetSection(FrontendOptions.SectionName));
 
         services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(configuration.GetConnectionString("Redis")
+            ConnectionMultiplexer.Connect(Environment.GetEnvironmentVariable(EnvironmentVariableConst.RedisConnectionString)
                 ?? throw new InvalidOperationException("Missing ConnectionStrings:Redis configuration.")));
 
         services.AddHttpContextAccessor();
@@ -62,11 +64,12 @@ public static class DependencyInjection
             .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
             .UseSimpleAssemblyNameTypeSerializer()
             .UseRecommendedSerializerSettings()
-            .UseSqlServerStorage(configuration.GetConnectionString("Default")));
+            .UseSqlServerStorage(Environment.GetEnvironmentVariable(EnvironmentVariableConst.SqlServerConnectionString)
+                ?? throw new InvalidOperationException("Missing ConnectionStrings:Default configuration.")));
 
         services.AddHangfireServer(options =>
         {
-            options.Queues = ["emails"];
+            options.Queues = new[] { "emails" };
             options.WorkerCount = 1;
         });
 
