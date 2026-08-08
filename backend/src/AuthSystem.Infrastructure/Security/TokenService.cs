@@ -55,7 +55,7 @@ public class TokenService(ECDsa signingKey, IOptions<JwtOptions> options) : ITok
 
     public string HashToken(string rawToken)
     {
-        var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rawToken));
+        var bytes = SHA512.HashData(System.Text.Encoding.UTF8.GetBytes(rawToken));
         return Convert.ToHexString(bytes);
     }
 }

@@ -1,6 +1,7 @@
 using AuthSystem.Api.Extensions;
 using AuthSystem.Application.Dtos;
 using AuthSystem.Application.Interfaces;
+using AuthSystem.Domain.Constant;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,8 +11,6 @@ namespace AuthSystem.Api.Controllers;
 [Route("api/auth")]
 public class AuthController(IAuthService authService) : ControllerBase
 {
-    private const string RefreshCookieName = "refreshToken";
-
     [HttpPost("register")]
     [AllowAnonymous]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
@@ -40,11 +39,11 @@ public class AuthController(IAuthService authService) : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Refresh(CancellationToken ct)
     {
-        var rawToken = Request.Cookies[RefreshCookieName] ?? string.Empty;
+        var rawToken = Request.Cookies[CookieConst.RefreshCookieName] ?? string.Empty;
         var result = await authService.RefreshAsync(rawToken, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
         if (!result.Succeeded || result.Data is null)
         {
-            Response.Cookies.Delete(RefreshCookieName);
+            Response.Cookies.Delete(CookieConst.RefreshCookieName);
             return Unauthorized(new { errors = result.Errors });
         }
 
@@ -56,13 +55,13 @@ public class AuthController(IAuthService authService) : ControllerBase
     [Authorize]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
-        var rawToken = Request.Cookies[RefreshCookieName];
+        var rawToken = Request.Cookies[CookieConst.RefreshCookieName];
         if (!string.IsNullOrEmpty(rawToken))
         {
             await authService.LogoutAsync(rawToken, ct);
         }
 
-        Response.Cookies.Delete(RefreshCookieName);
+        Response.Cookies.Delete(CookieConst.RefreshCookieName);
         return NoContent();
     }
 
@@ -105,7 +104,7 @@ public class AuthController(IAuthService authService) : ControllerBase
 
     private void SetRefreshCookie(string token, DateTimeOffset expiresAt)
     {
-        Response.Cookies.Append(RefreshCookieName, token, new CookieOptions
+        Response.Cookies.Append(CookieConst.RefreshCookieName, token, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
