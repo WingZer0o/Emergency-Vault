@@ -1,0 +1,60 @@
+<div class="auth-page">
+  <mat-card class="auth-card">
+    @if (!recoveryKey()) {
+      <mat-card-header>
+        <mat-card-title>Set up your vault</mat-card-title>
+        <mat-card-subtitle>
+          Encrypts your sensitive info in your browser before it's ever sent to the server.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="form" (ngSubmit)="submit()">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Confirm your password</mat-label>
+            <input matInput type="password" formControlName="password" autocomplete="current-password" />
+            @if (form.controls.password.hasError('required')) {
+              <mat-error>Password is required.</mat-error>
+            }
+          </mat-form-field>
+
+          @if (errorMessage(); as message) {
+            <p class="error-text">{{ message }}</p>
+          }
+
+          <div class="actions">
+            <span></span>
+            <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
+              @if (loading()) {
+                <mat-progress-spinner diameter="20" mode="indeterminate" />
+              } @else {
+                Set up vault
+              }
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    } @else {
+      <mat-card-header>
+        <mat-card-title>Save your recovery key</mat-card-title>
+        <mat-card-subtitle>
+          This is the only way to recover your vault if you ever forget your password. It will not
+          be shown again.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="recovery-key">{{ recoveryKey() }}</p>
+
+        <mat-checkbox [checked]="savedConfirmed()" (change)="savedConfirmed.set($event.checked)">
+          I've saved this recovery key somewhere safe.
+        </mat-checkbox>
+
+        <div class="actions">
+          <span></span>
+          <button mat-flat-button color="primary" type="button" [disabled]="!savedConfirmed()" (click)="finish()">
+            Continue
+          </button>
+        </div>
+      </mat-card-content>
+    }
+  </mat-card>
+</div>

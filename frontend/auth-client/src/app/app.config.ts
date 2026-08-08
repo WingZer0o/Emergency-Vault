@@ -8,6 +8,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { refreshInterceptor } from './core/interceptors/refresh.interceptor';
 import { AuthService } from './core/services/auth.service';
+import { VaultSessionService } from './core/services/vault-session.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -16,5 +17,9 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     provideHttpClient(withInterceptors([authInterceptor, refreshInterceptor])),
     provideAppInitializer(() => firstValueFrom(inject(AuthService).tryRestoreSession())),
+    // Restores an unlocked vault session from IndexedDB (if any) before the router runs, so
+    // vaultUnlockedGuard sees the correct isUnlocked() state on the very first navigation
+    // instead of momentarily redirecting to the unlock screen after every refresh.
+    provideAppInitializer(() => inject(VaultSessionService).restoreFromStorage()),
   ],
 };

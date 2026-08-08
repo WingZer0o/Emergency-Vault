@@ -1,0 +1,35 @@
+<div class="vault-page">
+  <div class="vault-header">
+    <h1>My vault</h1>
+    <div class="vault-header-actions">
+      <a mat-stroked-button routerLink="/vault/sharing">Emergency access</a>
+      <a mat-stroked-button routerLink="/vault/shared-with-me">Shared with me</a>
+      <a mat-flat-button color="primary" routerLink="/vault/items/new">
+        <mat-icon>add</mat-icon>
+        New item
+      </a>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (errorMessage(); as message) {
+    <p class="error-text">{{ message }}</p>
+  } @else if (items().length === 0) {
+    <p>No items yet. Add your first one.</p>
+  } @else {
+    <mat-card>
+      <mat-list>
+        @for (item of items(); track item.id) {
+          <mat-list-item (click)="openItem(item.id)" class="vault-item">
+            <span matListItemTitle>{{ item.label }}</span>
+            <span matListItemLine>{{ item.itemType }}</span>
+            <button mat-icon-button matListItemMeta (click)="deleteItem(item.id, $event)" aria-label="Delete item">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </mat-list-item>
+        }
+      </mat-list>
+    </mat-card>
+  }
+</div>

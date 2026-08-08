@@ -24,6 +24,10 @@
     </button>
   </mat-menu>
   @if (authService.isAuthenticated()) {
+    <a mat-button routerLink="/vault">
+      <mat-icon>lock</mat-icon>
+      Vault
+    </a>
     <span class="user-email">{{ authService.currentUser()?.email }}</span>
     <button mat-button (click)="logout()">
       <mat-icon>logout</mat-icon>

@@ -1,0 +1,25 @@
+<div class="vault-page">
+  <div class="vault-header">
+    <h1>Shared with me</h1>
+    <a mat-button routerLink="/vault">Back to vault</a>
+  </div>
+
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (errorMessage(); as message) {
+    <p class="error-text">{{ message }}</p>
+  } @else if (shares().length === 0) {
+    <p>No one has shared their vault with you yet.</p>
+  } @else {
+    <mat-card>
+      <mat-list>
+        @for (share of shares(); track share.ownerUserId) {
+          <mat-list-item (click)="open(share.ownerUserId)" class="vault-item">
+            <span matListItemTitle>{{ share.ownerName }}</span>
+            <span matListItemLine>{{ share.ownerEmail }}</span>
+          </mat-list-item>
+        }
+      </mat-list>
+    </mat-card>
+  }
+</div>

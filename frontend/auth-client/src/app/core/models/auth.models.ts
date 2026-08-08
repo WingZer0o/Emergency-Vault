@@ -1,3 +1,5 @@
+import { VaultRecoverRequest } from './vault.models';
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -45,6 +47,8 @@ export interface ResetPasswordRequest {
   userId: string;
   token: string;
   newPassword: string;
+  /** Present only when the account has a vault and the user supplied their recovery key during reset - re-wraps the vault's private key under the new password in the same request. */
+  vaultRewrap?: VaultRecoverRequest;
 }
 
 export interface ApiErrorBody {

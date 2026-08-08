@@ -1,0 +1,76 @@
+using AuthSystem.Application.Interfaces;
+using AuthSystem.Domain.Entities;
+using AuthSystem.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace AuthSystem.Infrastructure.Repositories;
+
+public class VaultRepository(AppDbContext db) : IVaultRepository
+{
+    public async Task<VaultProfile?> GetProfileAsync(Guid userId, CancellationToken ct)
+    {
+        return await db.VaultProfiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+    }
+
+    public async Task AddProfileAsync(VaultProfile profile, CancellationToken ct)
+    {
+        await db.VaultProfiles.AddAsync(profile, ct);
+    }
+
+    public async Task<VaultKeyShare?> GetActiveShareAsync(Guid vaultOwnerUserId, Guid holderUserId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares.FirstOrDefaultAsync(
+            s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId == holderUserId && s.RevokedAt == null, ct);
+    }
+
+    public async Task<VaultKeyShare?> GetShareByIdAsync(Guid shareId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares.FirstOrDefaultAsync(s => s.Id == shareId, ct);
+    }
+
+    public async Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesGrantedByAsync(Guid vaultOwnerUserId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares
+            .Include(s => s.Holder)
+            .Where(s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId != vaultOwnerUserId && s.RevokedAt == null)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesHeldByAsync(Guid holderUserId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares
+            .Include(s => s.VaultOwner)
+            .Where(s => s.HolderUserId == holderUserId && s.VaultOwnerUserId != holderUserId && s.RevokedAt == null)
+            .ToListAsync(ct);
+    }
+
+    public async Task AddShareAsync(VaultKeyShare share, CancellationToken ct)
+    {
+        await db.VaultKeyShares.AddAsync(share, ct);
+    }
+
+    public async Task<IReadOnlyList<VaultItem>> GetItemsByOwnerAsync(Guid ownerUserId, CancellationToken ct)
+    {
+        return await db.VaultItems.Where(i => i.OwnerUserId == ownerUserId).ToListAsync(ct);
+    }
+
+    public async Task<VaultItem?> GetItemAsync(Guid itemId, Guid ownerUserId, CancellationToken ct)
+    {
+        return await db.VaultItems.FirstOrDefaultAsync(i => i.Id == itemId && i.OwnerUserId == ownerUserId, ct);
+    }
+
+    public async Task AddItemAsync(VaultItem item, CancellationToken ct)
+    {
+        await db.VaultItems.AddAsync(item, ct);
+    }
+
+    public void RemoveItem(VaultItem item)
+    {
+        db.VaultItems.Remove(item);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct)
+    {
+        await db.SaveChangesAsync(ct);
+    }
+}

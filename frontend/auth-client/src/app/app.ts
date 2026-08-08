@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,11 +8,13 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { AuthService } from './core/services/auth.service';
 import { ThemeMode, ThemeService } from './core/services/theme.service';
+import { VaultSessionService } from './core/services/vault-session.service';
 
 @Component({
   selector: 'app-root',
   imports: [
     RouterOutlet,
+    RouterLink,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
@@ -25,6 +27,7 @@ import { ThemeMode, ThemeService } from './core/services/theme.service';
 export class App {
   protected readonly authService = inject(AuthService);
   protected readonly themeService = inject(ThemeService);
+  private readonly vaultSession = inject(VaultSessionService);
   private readonly router = inject(Router);
 
   protected readonly themeIcons: Record<ThemeMode, string> = {
@@ -38,6 +41,10 @@ export class App {
   }
 
   logout(): void {
-    this.authService.logout().subscribe(() => this.router.navigateByUrl('/login'));
+    this.authService.logout().subscribe(() => {
+      this.vaultSession.lock().then(() => {
+        this.router.navigateByUrl('/login');
+      });
+    });
   }
 }

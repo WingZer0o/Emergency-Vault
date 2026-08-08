@@ -19,6 +19,7 @@ public class AuthService(
     IRefreshTokenCache refreshTokenCache,
     IUserFailedLoginRepository userFailedLoginRepository,
     IEmailSender emailSender,
+    IVaultService vaultService,
     IOptions<JwtOptions> jwtOptions,
     IOptions<FrontendOptions> frontendOptions,
     IOptions<Two2FACodesOptions> two2FACodesOptions,
@@ -367,6 +368,14 @@ public class AuthService(
         if (!result.Succeeded)
         {
             return ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+        }
+
+        if (request.VaultRewrap is not null)
+        {
+            // Best-effort: a failed re-wrap (e.g. stale/missing vault) shouldn't block an
+            // otherwise-successful password reset - the user can still recover vault access
+            // separately via /vault/recover as long as they still have the recovery key.
+            await vaultService.RewrapMasterKeyAsync(user.Id, request.VaultRewrap, ct);
         }
 
         return ServiceResult.Success();

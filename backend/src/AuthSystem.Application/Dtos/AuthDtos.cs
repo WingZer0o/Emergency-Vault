@@ -17,7 +17,19 @@ public record ForgotPasswordRequest([Required, EmailAddress] string Email);
 public record ResetPasswordRequest(
     [Required] Guid UserId,
     [Required] string Token,
-    [Required, MinLength(8)] string NewPassword);
+    [Required, MinLength(8)] string NewPassword,
+    VaultRewrapDto? VaultRewrap = null);
+
+/// <summary>
+/// Optional companion to a password reset: re-wraps the vault private key (already decrypted
+/// client-side using the recovery key) under a Master Key derived from the new password, so a
+/// reset doesn't need the old password to preserve vault access. Absent = vault, if any, is left
+/// locked until the user runs the standalone /vault/recover flow.
+/// </summary>
+public record VaultRewrapDto(
+    [Required] string NewKdfSalt,
+    [Required, Range(200_000, 5_000_000)] int NewKdfIterations,
+    [Required] string NewPrivateKeyWrappedByMasterKey);
 
 public record UserProfileDto(Guid Id, string Email, string FirstName, string LastName, IReadOnlyList<string> Roles);
 

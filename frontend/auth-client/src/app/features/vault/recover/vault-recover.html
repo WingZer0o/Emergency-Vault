@@ -1,0 +1,45 @@
+<div class="auth-page">
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title>Recover vault access</mat-card-title>
+      <mat-card-subtitle>
+        Use your one-time recovery key to regain access - for example, after resetting your
+        password without also providing it.
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Recovery key</mat-label>
+          <input matInput type="text" formControlName="recoveryKey" autocomplete="off" />
+          @if (form.controls.recoveryKey.hasError('required')) {
+            <mat-error>Recovery key is required.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Your current account password</mat-label>
+          <input matInput type="password" formControlName="currentPassword" autocomplete="current-password" />
+          @if (form.controls.currentPassword.hasError('required')) {
+            <mat-error>Password is required.</mat-error>
+          }
+        </mat-form-field>
+
+        @if (errorMessage(); as message) {
+          <p class="error-text">{{ message }}</p>
+        }
+
+        <div class="actions">
+          <span></span>
+          <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
+            @if (loading()) {
+              <mat-progress-spinner diameter="20" mode="indeterminate" />
+            } @else {
+              Restore access
+            }
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

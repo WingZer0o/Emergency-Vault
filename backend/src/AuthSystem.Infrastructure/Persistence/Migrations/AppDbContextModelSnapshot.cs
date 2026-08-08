@@ -211,6 +211,107 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("UserFailedLogins", (string)null);
                 });
 
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CiphertextBlob")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.ToTable("VaultItems", (string)null);
+                });
+
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultKeyShare", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("HolderUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("VaultOwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("WrappedUvk")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HolderUserId");
+
+                    b.HasIndex("VaultOwnerUserId", "HolderUserId")
+                        .IsUnique()
+                        .HasFilter("[RevokedAt] IS NULL");
+
+                    b.ToTable("VaultKeyShares", (string)null);
+                });
+
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("KdfIterations")
+                        .HasColumnType("int");
+
+                    b.Property<string>("KdfSalt")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PrivateKeyWrappedByMasterKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PrivateKeyWrappedByRecoveryKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("VaultProfiles", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -331,6 +432,47 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                         .WithMany("FailedLogins")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultItem", b =>
+                {
+                    b.HasOne("AuthSystem.Domain.Entities.ApplicationUser", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultKeyShare", b =>
+                {
+                    b.HasOne("AuthSystem.Domain.Entities.ApplicationUser", "Holder")
+                        .WithMany()
+                        .HasForeignKey("HolderUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AuthSystem.Domain.Entities.ApplicationUser", "VaultOwner")
+                        .WithMany()
+                        .HasForeignKey("VaultOwnerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Holder");
+
+                    b.Navigation("VaultOwner");
+                });
+
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultProfile", b =>
+                {
+                    b.HasOne("AuthSystem.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });

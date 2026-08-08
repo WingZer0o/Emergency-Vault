@@ -1,0 +1,22 @@
+.vault-page {
+  padding: 24px;
+}
+
+.item-form-card {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: start;
+}

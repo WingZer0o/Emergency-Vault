@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { AuthService } from '../../../core/services/auth.service';
+import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../auth-error.util';
 
 @Component({
@@ -27,11 +28,15 @@ import { extractErrorMessage } from '../auth-error.util';
 export class Login {
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
+  private readonly vaultSession = inject(VaultSessionService);
   private readonly router = inject(Router);
 
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly twoFactorToken = signal<string | null>(null);
+
+  /** Captured at submit() so a silent vault unlock attempt can reuse it after a 2FA challenge, without prompting for the password twice. */
+  private pendingPassword = '';
 
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -50,6 +55,7 @@ export class Login {
 
     this.loading.set(true);
     this.errorMessage.set(null);
+    this.pendingPassword = this.form.getRawValue().password;
 
     this.authService.login(this.form.getRawValue()).subscribe({
       next: (response) => {
@@ -57,6 +63,7 @@ export class Login {
         if (response.requiresTwoFactor) {
           this.twoFactorToken.set(response.twoFactorToken);
         } else {
+          this.tryUnlockVault();
           this.router.navigateByUrl('/dashboard');
         }
       },
@@ -80,6 +87,7 @@ export class Login {
     this.authService.verifyTwoFactor({ twoFactorToken: token, code: this.codeForm.getRawValue().code }).subscribe({
       next: () => {
         this.loading.set(false);
+        this.tryUnlockVault();
         this.router.navigateByUrl('/dashboard');
       },
       error: (err) => {
@@ -87,6 +95,17 @@ export class Login {
         this.errorMessage.set(extractErrorMessage(err, 'Incorrect code.'));
       },
     });
+  }
+
+  /**
+   * Best-effort, fire-and-forget: unlocks the vault silently using the password already typed for
+   * login, so the common case needs no extra prompt. Failure (no vault, or a password that's
+   * diverged from the vault's) is swallowed - vaultUnlockedGuard falls back to the explicit
+   * unlock screen the next time the user navigates into /vault. Deliberately one-directional
+   * (Login -> Vault) so a vault failure can never affect core auth.
+   */
+  private tryUnlockVault(): void {
+    this.vaultSession.unlockWithPassword(this.pendingPassword).catch(() => {});
   }
 
   resendCode(): void {

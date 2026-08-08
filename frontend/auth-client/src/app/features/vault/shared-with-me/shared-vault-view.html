@@ -1,0 +1,46 @@
+<div class="vault-page">
+  <div class="vault-header">
+    <h1>{{ ownerName() || 'Shared vault' }}</h1>
+    <a mat-button routerLink="/vault/shared-with-me">Back</a>
+  </div>
+
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (errorMessage(); as message) {
+    <p class="error-text">{{ message }}</p>
+  } @else if (items().length === 0) {
+    <p>This vault has no items yet.</p>
+  } @else {
+    @for (item of items(); track item.id) {
+      <mat-card class="item-card">
+        <mat-card-header>
+          <mat-card-title>{{ item.label }}</mat-card-title>
+          <mat-card-subtitle>{{ item.itemType }}</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <dl class="field-list">
+            @for (field of item.fields; track field.name) {
+              <div class="field-row-view">
+                <dt>{{ field.name }}</dt>
+                <dd>
+                  <span>{{ isRevealed(item.id + field.name) ? field.value : '••••••••' }}</span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="toggleReveal(item.id + field.name)"
+                    aria-label="Toggle visibility"
+                  >
+                    <mat-icon>{{ isRevealed(item.id + field.name) ? 'visibility_off' : 'visibility' }}</mat-icon>
+                  </button>
+                  <button mat-icon-button type="button" (click)="copyValue(field.value)" aria-label="Copy value">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </dd>
+              </div>
+            }
+          </dl>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</div>
