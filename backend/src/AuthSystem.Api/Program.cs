@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using AuthSystem.Application;
 using AuthSystem.Application.Options;
+using AuthSystem.Domain.Constant;
 using AuthSystem.Infrastructure;
 using AuthSystem.Infrastructure.Persistence;
 using AuthSystem.Infrastructure.Security;
@@ -10,6 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
+await InfisicalSetup.InjectEmailAPISecrets();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Missing Jwt configuration section.");
@@ -17,18 +19,16 @@ var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<Jw
 // Loaded once here and shared as a singleton so the signing key (TokenService) and the
 // JWT Bearer validation parameters below always agree on the exact same ECDSA P-521 key.
 using var keyLoggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
-var signingKey = EcdsaKeyProvider.LoadOrCreate(jwtOptions.KeyPath, keyLoggerFactory.CreateLogger("EcdsaSigningKey"));
+var signingKeyPem = Environment.GetEnvironmentVariable(EnvironmentVariableConst.JwtSigningKeyPem)
+    ?? throw new InvalidOperationException($"Missing {EnvironmentVariableConst.JwtSigningKeyPem} environment variable.");
+var signingKey = EcdsaKeyProvider.Load(signingKeyPem, keyLoggerFactory.CreateLogger("EcdsaSigningKey"));
 builder.Services.AddSingleton(signingKey);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplicationServices();
 
-// Persisted alongside the JWT signing key (same volume) so email-confirmation and
-// password-reset tokens (which Identity protects via DataProtection) survive restarts.
-var keysDirectory = Path.GetDirectoryName(Path.GetFullPath(jwtOptions.KeyPath))!;
 builder.Services.AddDataProtection()
-    .SetApplicationName("AuthSystem")
-    .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
+    .SetApplicationName("AuthSystem");
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();

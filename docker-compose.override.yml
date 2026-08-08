@@ -4,6 +4,8 @@
 # container. To run the production-like build instead: `docker compose -f docker-compose.yml up`.
 services:
   api:
+    env_file:
+      - path: ./.env
     build:
       target: dev
     # First-boot bind-mount attachment on Docker Desktop can occasionally race with

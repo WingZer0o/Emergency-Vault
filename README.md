@@ -31,7 +31,6 @@ frontend/
 docker-compose.yml             - base service definitions (sqlserver, redis, api, frontend)
 docker-compose.override.yml    - auto-merged dev overrides: hot reload for api + frontend
 docker-compose.prod.yml        - optimized build overlay (opt-in, see below)
-keys/                          - persisted ECDSA signing key + DataProtection keys (gitignored)
 ```
 
 ## Running it
@@ -79,7 +78,7 @@ docker compose up sqlserver redis -d
 | Setting | Where | Notes |
 |---|---|---|
 | `SA_PASSWORD` | `.env` (gitignored, copy from `.env.example`) | SQL Server sa password |
-| `Jwt:KeyPath` | appsettings / `Jwt__KeyPath` env var | ECDSA P-521 PEM key; auto-generated on first run if missing, persisted under `keys/` |
+| `JWT_SIGNING_KEY_PEM` | Infisical secret, injected as an environment variable | ECDSA P-521 PEM key used to sign JWTs |
 | `Frontend:BaseUrl` | appsettings / `Frontend__BaseUrl` | Used to build email confirmation / password reset links |
 | `Cors:AllowedOrigins` | appsettings / `Cors__AllowedOrigins__0`, `__1`, ... | Must include whatever origin the browser loads the frontend from |
 
@@ -90,8 +89,8 @@ implementation of `IEmailSender` for production.
 ## Auth design notes
 
 - **Access token**: short-lived (15 min default), returned in the JSON response body, signed
-  with ECDSA P-521 (`ES512`). The signing key lives at `keys/ecdsa-p521.pem`, generated on first
-  run and persisted so tokens survive restarts.
+  with ECDSA P-521 (`ES512`). The signing key is stored in Infisical and injected as the
+  `JWT_SIGNING_KEY_PEM` environment variable.
 - **Refresh token**: SQL Server is the source of truth (`RefreshTokens` table, rotated on every
   use, hash stored - not the raw token). Redis mirrors `hash -> userId` with a matching TTL for
   fast validation; a Redis miss falls back to SQL Server rather than failing the request.

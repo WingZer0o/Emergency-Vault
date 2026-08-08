@@ -24,7 +24,7 @@ services:
     build:
       context: ./backend
       dockerfile: src/AuthSystem.Api/Dockerfile
-      target: dev
+      target: final
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -36,18 +36,15 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: "Server=sqlserver,1433;Database=AuthSystemDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;"
       ConnectionStrings__Redis: "redis:6379"
-      Jwt__KeyPath: /keys/ecdsa-p521.pem
       Frontend__BaseUrl: "http://localhost"
       Cors__AllowedOrigins__0: "http://localhost"
       Cors__AllowedOrigins__1: "http://localhost:4200"
-    volumes:
-      - ./keys:/keys
 
   frontend:
     build:
       context: ./frontend/auth-client
       dockerfile: Dockerfile
-      target: dev
+      target: final
     depends_on:
       - api
     expose:
