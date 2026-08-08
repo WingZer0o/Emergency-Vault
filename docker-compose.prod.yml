@@ -1,0 +1,14 @@
+# Prod-like run: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build`
+# Bypasses docker-compose.override.yml (which Compose only auto-merges when no -f flags are
+# given). docker-compose.yml's own default build target is `dev`, so this file explicitly
+# restores the optimized `final` stage for both services and publishes the frontend on port 80.
+services:
+  api:
+    build:
+      target: final
+
+  frontend:
+    build:
+      target: final
+    ports:
+      - "80:80"

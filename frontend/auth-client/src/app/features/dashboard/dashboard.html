@@ -1,0 +1,37 @@
+<div class="dashboard-page">
+  <mat-card class="profile-card">
+    <mat-card-header>
+      <mat-card-title>Welcome, {{ authService.currentUser()?.firstName }}</mat-card-title>
+      <mat-card-subtitle>{{ authService.currentUser()?.email }}</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <mat-chip-set>
+        @for (role of authService.currentUser()?.roles; track role) {
+          <mat-chip>{{ role }}</mat-chip>
+        }
+      </mat-chip-set>
+    </mat-card-content>
+  </mat-card>
+
+  @if (authService.hasRole('Admin')) {
+    <mat-card class="admin-card">
+      <mat-card-header>
+        <mat-card-title>All users (Admin only)</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (usersLoading()) {
+          <mat-progress-spinner diameter="28" mode="indeterminate" />
+        } @else {
+          <mat-list>
+            @for (user of users(); track user.id) {
+              <mat-list-item>
+                <span matListItemTitle>{{ user.firstName }} {{ user.lastName }}</span>
+                <span matListItemLine>{{ user.email }} - {{ user.roles.join(', ') }}</span>
+              </mat-list-item>
+            }
+          </mat-list>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

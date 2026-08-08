@@ -1,0 +1,66 @@
+<div class="auth-page">
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title>Create account</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (successMessage(); as message) {
+        <p class="success-text">{{ message }}</p>
+        <p class="switch-link"><a routerLink="/login">Back to sign in</a></p>
+      } @else {
+        <form [formGroup]="form" (ngSubmit)="submit()">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>First name</mat-label>
+            <input matInput formControlName="firstName" autocomplete="given-name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Last name</mat-label>
+            <input matInput formControlName="lastName" autocomplete="family-name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Email</mat-label>
+            <input matInput type="email" formControlName="email" autocomplete="email" />
+            @if (form.controls.email.hasError('email')) {
+              <mat-error>Enter a valid email.</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Password</mat-label>
+            <input matInput type="password" formControlName="password" autocomplete="new-password" />
+            @if (form.controls.password.hasError('minlength')) {
+              <mat-error>Password must be at least 8 characters.</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Confirm password</mat-label>
+            <input matInput type="password" formControlName="confirmPassword" autocomplete="new-password" />
+            @if (form.hasError('passwordMismatch') && form.controls.confirmPassword.touched) {
+              <mat-error>Passwords do not match.</mat-error>
+            }
+          </mat-form-field>
+
+          @if (errorMessage(); as message) {
+            <p class="error-text">{{ message }}</p>
+          }
+
+          <div class="actions">
+            <span></span>
+            <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
+              @if (loading()) {
+                <mat-progress-spinner diameter="20" mode="indeterminate" />
+              } @else {
+                Create account
+              }
+            </button>
+          </div>
+        </form>
+
+        <p class="switch-link">Already have an account? <a routerLink="/login">Sign in</a></p>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

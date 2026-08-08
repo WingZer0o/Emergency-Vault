@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AuthSystem.Api/AuthSystem.Api.csproj" />
+    <Project Path="src/AuthSystem.Application/AuthSystem.Application.csproj" />
+    <Project Path="src/AuthSystem.Domain/AuthSystem.Domain.csproj" />
+    <Project Path="src/AuthSystem.Infrastructure/AuthSystem.Infrastructure.csproj" />
+  </Folder>
+</Solution>

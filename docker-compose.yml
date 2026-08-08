@@ -1,0 +1,57 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD}
+    ports:
+      - "14330:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/1433' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: src/AuthSystem.Api/Dockerfile
+      target: dev
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Server=sqlserver,1433;Database=AuthSystemDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;"
+      ConnectionStrings__Redis: "redis:6379"
+      Jwt__KeyPath: /keys/ecdsa-p521.pem
+      Frontend__BaseUrl: "http://localhost"
+      Cors__AllowedOrigins__0: "http://localhost"
+      Cors__AllowedOrigins__1: "http://localhost:4200"
+    volumes:
+      - ./keys:/keys
+
+  frontend:
+    build:
+      context: ./frontend/auth-client
+      dockerfile: Dockerfile
+      target: dev
+    depends_on:
+      - api
+    expose:
+      - "80"
+
+volumes:
+  sqlserver_data:

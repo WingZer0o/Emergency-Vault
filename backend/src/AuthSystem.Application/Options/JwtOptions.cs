@@ -1,0 +1,15 @@
+namespace AuthSystem.Application.Options;
+
+public class JwtOptions
+{
+    public const string SectionName = "Jwt";
+
+    public string Issuer { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+
+    /// <summary>Filesystem path to the ECDSA P-521 PEM key pair, generated on first run if missing.</summary>
+    public string KeyPath { get; set; } = string.Empty;
+
+    public int AccessTokenMinutes { get; set; } = 15;
+    public int RefreshTokenDays { get; set; } = 7;
+}
