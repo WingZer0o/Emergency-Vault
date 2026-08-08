@@ -1,13 +1,24 @@
+using System.Security.Cryptography;
+using System.Text;
 using AuthSystem.Application.Dtos;
 using AuthSystem.Application.Interfaces;
+using AuthSystem.Application.Options;
 using AuthSystem.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AuthSystem.Application.Services;
 
-public class VaultService(IVaultRepository vaultRepository, UserManager<ApplicationUser> userManager) : IVaultService
+public class VaultService(
+    IVaultRepository vaultRepository,
+    UserManager<ApplicationUser> userManager,
+    IHotpService hotpService,
+    IEmailSender emailSender,
+    IOptions<VaultShareCodesOptions> vaultShareCodesOptions) : IVaultService
 {
+    private readonly VaultShareCodesOptions _vaultShareCodesOptions = vaultShareCodesOptions.Value;
+
     public async Task<ServiceResult> SetupAsync(Guid userId, VaultSetupRequest request, CancellationToken ct)
     {
         var existing = await vaultRepository.GetProfileAsync(userId, ct);
@@ -37,6 +48,8 @@ public class VaultService(IVaultRepository vaultRepository, UserManager<Applicat
             VaultOwnerUserId = userId,
             HolderUserId = userId,
             WrappedUvk = request.SelfWrappedUvk,
+            // Self-share never goes through the emailed-code flow - it's usable immediately.
+            VerifiedAt = DateTimeOffset.UtcNow,
         }, ct);
 
         try
@@ -222,25 +235,39 @@ public class VaultService(IVaultRepository vaultRepository, UserManager<Applicat
             existingShare.RevokedAt = DateTimeOffset.UtcNow;
         }
 
+        var owner = await userManager.FindByIdAsync(ownerUserId.ToString())
+            ?? throw new InvalidOperationException("Vault owner not found.");
+
+        var now = DateTimeOffset.UtcNow;
         var share = new VaultKeyShare
         {
             Id = Guid.NewGuid(),
             VaultOwnerUserId = ownerUserId,
+            VaultOwner = owner,
             HolderUserId = holder.Id,
+            Holder = holder,
             WrappedUvk = request.WrappedUvk,
+            VerificationSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(20)),
+            VerificationCounter = 1,
+            VerificationCodeExpiresAt = now + _vaultShareCodesOptions.CodeExpiration,
+            VerificationCodeSentAt = now,
         };
         await vaultRepository.AddShareAsync(share, ct);
         await vaultRepository.SaveChangesAsync(ct);
 
+        var code = hotpService.GenerateCode(
+            Convert.FromBase64String(share.VerificationSecret), share.VerificationCounter, _vaultShareCodesOptions.CodeLength);
+        await emailSender.SendVaultShareCodeAsync(holder.Email!, code, $"{owner.FirstName} {owner.LastName}", ct);
+
         return ServiceResult<VaultShareDto>.Success(
-            new VaultShareDto(share.Id, holder.Id, $"{holder.FirstName} {holder.LastName}", holder.Email!, share.GrantedAt));
+            new VaultShareDto(share.Id, holder.Id, $"{holder.FirstName} {holder.LastName}", holder.Email!, share.GrantedAt, ComputeStatus(share)));
     }
 
     public async Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetSharesAsync(Guid ownerUserId, CancellationToken ct)
     {
         var shares = await vaultRepository.GetActiveSharesGrantedByAsync(ownerUserId, ct);
         var dtos = shares
-            .Select(s => new VaultShareDto(s.Id, s.HolderUserId, $"{s.Holder.FirstName} {s.Holder.LastName}", s.Holder.Email!, s.GrantedAt))
+            .Select(s => new VaultShareDto(s.Id, s.HolderUserId, $"{s.Holder.FirstName} {s.Holder.LastName}", s.Holder.Email!, s.GrantedAt, ComputeStatus(s)))
             .ToList();
         return ServiceResult<IReadOnlyList<VaultShareDto>>.Success(dtos);
     }
@@ -269,7 +296,9 @@ public class VaultService(IVaultRepository vaultRepository, UserManager<Applicat
     {
         var shares = await vaultRepository.GetActiveSharesHeldByAsync(holderUserId, ct);
         var dtos = shares
-            .Select(s => new VaultSharedWithMeDto(s.VaultOwnerUserId, $"{s.VaultOwner.FirstName} {s.VaultOwner.LastName}", s.VaultOwner.Email!, s.WrappedUvk, s.GrantedAt))
+            .Select(s => new VaultSharedWithMeDto(
+                s.Id, s.VaultOwnerUserId, $"{s.VaultOwner.FirstName} {s.VaultOwner.LastName}", s.VaultOwner.Email!,
+                s.VerifiedAt is not null ? s.WrappedUvk : null, s.GrantedAt, ComputeStatus(s)))
             .ToList();
         return ServiceResult<IReadOnlyList<VaultSharedWithMeDto>>.Success(dtos);
     }
@@ -282,8 +311,117 @@ public class VaultService(IVaultRepository vaultRepository, UserManager<Applicat
             return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure("You don't have access to this vault.");
         }
 
+        if (share.VerifiedAt is null)
+        {
+            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure("This shared vault hasn't been verified yet.");
+        }
+
         var items = await vaultRepository.GetItemsByOwnerAsync(vaultOwnerUserId, ct);
         return ServiceResult<IReadOnlyList<VaultItemDto>>.Success(items.Select(ToDto).ToList());
+    }
+
+    public async Task<ServiceResult> VerifyShareAsync(Guid holderUserId, Guid shareId, string code, CancellationToken ct)
+    {
+        var share = await vaultRepository.GetShareByIdAsync(shareId, ct);
+        if (share is null || share.HolderUserId != holderUserId || share.RevokedAt is not null)
+        {
+            return ServiceResult.Failure("Share not found.");
+        }
+
+        if (share.VerifiedAt is not null)
+        {
+            return ServiceResult.Success();
+        }
+
+        if (share.VerificationAttempts >= _vaultShareCodesOptions.MaxAttempts)
+        {
+            return ServiceResult.Failure("Too many incorrect attempts. Ask the owner to share the vault again.");
+        }
+
+        if (share.VerificationCodeExpiresAt is null || DateTimeOffset.UtcNow > share.VerificationCodeExpiresAt)
+        {
+            return ServiceResult.Failure("This code has expired. Request a new one.");
+        }
+
+        var expectedCode = hotpService.GenerateCode(
+            Convert.FromBase64String(share.VerificationSecret!), share.VerificationCounter, _vaultShareCodesOptions.CodeLength);
+
+        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(code), Encoding.UTF8.GetBytes(expectedCode)))
+        {
+            share.VerificationAttempts += 1;
+            await vaultRepository.SaveChangesAsync(ct);
+
+            return share.VerificationAttempts >= _vaultShareCodesOptions.MaxAttempts
+                ? ServiceResult.Failure("Too many incorrect attempts. Ask the owner to share the vault again.")
+                : ServiceResult.Failure("Incorrect code.");
+        }
+
+        share.VerifiedAt = DateTimeOffset.UtcNow;
+        share.VerificationSecret = null;
+        await vaultRepository.SaveChangesAsync(ct);
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult> ResendShareCodeAsync(Guid holderUserId, Guid shareId, CancellationToken ct)
+    {
+        var share = await vaultRepository.GetShareByIdAsync(shareId, ct);
+        if (share is null || share.HolderUserId != holderUserId || share.RevokedAt is not null)
+        {
+            return ServiceResult.Failure("Share not found.");
+        }
+
+        if (share.VerifiedAt is not null)
+        {
+            return ServiceResult.Failure("This share has already been verified.");
+        }
+
+        if (share.VerificationAttempts >= _vaultShareCodesOptions.MaxAttempts)
+        {
+            return ServiceResult.Failure("Too many incorrect attempts. Ask the owner to share the vault again.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (share.VerificationCodeSentAt is not null && now - share.VerificationCodeSentAt < _vaultShareCodesOptions.ResendCooldown)
+        {
+            return ServiceResult.Failure("Please wait a bit before requesting another code.");
+        }
+
+        var owner = await userManager.FindByIdAsync(share.VaultOwnerUserId.ToString())
+            ?? throw new InvalidOperationException("Vault owner not found.");
+        var holder = await userManager.FindByIdAsync(holderUserId.ToString())
+            ?? throw new InvalidOperationException("Holder not found.");
+
+        share.VerificationCounter += 1;
+        share.VerificationAttempts = 0;
+        share.VerificationCodeExpiresAt = now + _vaultShareCodesOptions.CodeExpiration;
+        share.VerificationCodeSentAt = now;
+        await vaultRepository.SaveChangesAsync(ct);
+
+        var code = hotpService.GenerateCode(
+            Convert.FromBase64String(share.VerificationSecret!), share.VerificationCounter, _vaultShareCodesOptions.CodeLength);
+        await emailSender.SendVaultShareCodeAsync(holder.Email!, code, $"{owner.FirstName} {owner.LastName}", ct);
+
+        return ServiceResult.Success();
+    }
+
+    private VaultShareStatus ComputeStatus(VaultKeyShare share)
+    {
+        if (share.VerifiedAt is not null)
+        {
+            return VaultShareStatus.Active;
+        }
+
+        if (share.VerificationAttempts >= _vaultShareCodesOptions.MaxAttempts)
+        {
+            return VaultShareStatus.Failed;
+        }
+
+        if (share.VerificationCodeExpiresAt is null || DateTimeOffset.UtcNow > share.VerificationCodeExpiresAt)
+        {
+            return VaultShareStatus.CodeExpired;
+        }
+
+        return VaultShareStatus.Pending;
     }
 
     private static VaultItemDto ToDto(VaultItem item) => new(item.Id, item.CiphertextBlob, item.CreatedAt, item.UpdatedAt);

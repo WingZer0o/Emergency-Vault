@@ -60,20 +60,31 @@ export interface CreateVaultShareRequest {
   wrappedUvk: string;
 }
 
+/** Mirrors AuthSystem.Application.Dtos.VaultShareStatus - serialized as a string via JsonStringEnumConverter. */
+export type VaultShareStatus = 'Pending' | 'Active' | 'CodeExpired' | 'Failed';
+
 export interface VaultShareDto {
   id: string;
   holderUserId: string;
   holderName: string;
   holderEmail: string;
   grantedAt: string;
+  status: VaultShareStatus;
 }
 
 export interface VaultSharedWithMeDto {
+  id: string;
   ownerUserId: string;
   ownerName: string;
   ownerEmail: string;
-  wrappedUvk: string;
+  /** Null until the holder has verified the emailed code. */
+  wrappedUvk: string | null;
   grantedAt: string;
+  status: VaultShareStatus;
+}
+
+export interface VerifyVaultShareRequest {
+  code: string;
 }
 
 /** A single labeled field within a vault item (e.g. { name: 'username', value: 'mike' }). */

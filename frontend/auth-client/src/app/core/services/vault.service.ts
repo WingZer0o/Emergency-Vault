@@ -16,6 +16,7 @@ import {
   VaultStatusDto,
   VaultUnlockBundleDto,
   VaultUserLookupDto,
+  VerifyVaultShareRequest,
 } from '../models/vault.models';
 
 /**
@@ -91,5 +92,13 @@ export class VaultService {
 
   getSharedItems(ownerUserId: string): Observable<VaultItemDto[]> {
     return this.http.get<VaultItemDto[]>(`${this.baseUrl}/shared-with-me/${ownerUserId}/items`);
+  }
+
+  verifyShare(id: string, request: VerifyVaultShareRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/shares/${id}/verify`, request);
+  }
+
+  resendShareCode(id: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/shares/${id}/resend-code`, {});
   }
 }

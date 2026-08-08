@@ -10,7 +10,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { importPublicKeySpki, wrapUvkForPublicKey } from '../../../core/crypto/webcrypto.util';
-import { VaultShareDto } from '../../../core/models/vault.models';
+import { VaultShareDto, VaultShareStatus } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
@@ -70,7 +70,9 @@ export class VaultSharing implements OnInit {
             this.vaultService.createShare({ holderEmail: email, wrappedUvk }).subscribe({
               next: (share) => {
                 this.loading.set(false);
-                this.successMessage.set(`Granted access to ${share.holderName}.`);
+                this.successMessage.set(
+                  `Invite sent to ${share.holderName} - pending verification. They'll need to enter the code emailed to them before they can access your vault.`,
+                );
                 this.form.reset();
                 this.loadShares();
               },
@@ -99,6 +101,19 @@ export class VaultSharing implements OnInit {
       next: () => this.shares.update((shares) => shares.filter((share) => share.id !== shareId)),
       error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not revoke access.')),
     });
+  }
+
+  statusLabel(status: VaultShareStatus): string {
+    switch (status) {
+      case 'Active':
+        return 'Active';
+      case 'Pending':
+        return 'Pending verification';
+      case 'CodeExpired':
+        return 'Code expired - ask them to resend it';
+      case 'Failed':
+        return 'Failed - revoke and share again';
+    }
   }
 
   private loadShares(): void {

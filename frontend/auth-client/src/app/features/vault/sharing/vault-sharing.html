@@ -58,7 +58,12 @@
           @for (share of shares(); track share.id) {
             <mat-list-item>
               <span matListItemTitle>{{ share.holderName }}</span>
-              <span matListItemLine>{{ share.holderEmail }}</span>
+              <span matListItemLine
+                >{{ share.holderEmail }} &middot;
+                <span class="share-status" [class]="'status-' + share.status.toLowerCase()">{{
+                  statusLabel(share.status)
+                }}</span></span
+              >
               <button mat-icon-button matListItemMeta (click)="revoke(share.id)" aria-label="Revoke access">
                 <mat-icon>close</mat-icon>
               </button>

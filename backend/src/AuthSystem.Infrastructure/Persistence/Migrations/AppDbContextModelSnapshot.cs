@@ -255,6 +255,24 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("VaultOwnerUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("VerificationAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("VerificationCodeExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("VerificationCodeSentAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("VerificationCounter")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("VerificationSecret")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("WrappedUvk")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

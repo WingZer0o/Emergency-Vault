@@ -13,11 +13,54 @@
   } @else {
     <mat-card>
       <mat-list>
-        @for (share of shares(); track share.ownerUserId) {
-          <mat-list-item (click)="open(share.ownerUserId)" class="vault-item">
+        @for (share of shares(); track share.id) {
+          <mat-list-item (click)="onItemClick(share)" class="vault-item" [class.disabled]="share.status === 'Failed'">
             <span matListItemTitle>{{ share.ownerName }}</span>
-            <span matListItemLine>{{ share.ownerEmail }}</span>
+            <span matListItemLine
+              >{{ share.ownerEmail }} &middot;
+              <span class="share-status" [class]="'status-' + share.status.toLowerCase()">{{
+                statusLabel(share.status)
+              }}</span></span
+            >
           </mat-list-item>
+          @if (verifyingId() === share.id) {
+            <form class="verify-form" [formGroup]="codeForm" (ngSubmit)="submitCode(share.id)">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Code</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  inputmode="numeric"
+                  formControlName="code"
+                  autocomplete="one-time-code"
+                  maxlength="6"
+                />
+                @if (codeForm.controls.code.hasError('required')) {
+                  <mat-error>Code is required.</mat-error>
+                } @else if (codeForm.controls.code.hasError('pattern')) {
+                  <mat-error>Enter the 6-digit code.</mat-error>
+                }
+              </mat-form-field>
+
+              @if (verifyError(); as message) {
+                <p class="error-text">{{ message }}</p>
+              }
+              @if (resendMessage(); as message) {
+                <p class="success-text">{{ message }}</p>
+              }
+
+              <div class="actions">
+                <a (click)="resendCode(share.id)">Resend code</a>
+                <button mat-flat-button color="primary" type="submit" [disabled]="verifying()">
+                  @if (verifying()) {
+                    <mat-progress-spinner diameter="20" mode="indeterminate" />
+                  } @else {
+                    Verify
+                  }
+                </button>
+              </div>
+            </form>
+          }
         }
       </mat-list>
     </mat-card>

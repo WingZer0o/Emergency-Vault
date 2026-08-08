@@ -1,4 +1,5 @@
 using AuthSystem.Application.Dtos;
+using AuthSystem.Application.Options;
 using AuthSystem.Application.Services;
 using AuthSystem.Application.Tests.Fakes;
 using AuthSystem.Domain.Entities;
@@ -10,11 +11,13 @@ namespace AuthSystem.Application.Tests;
 /// <summary>
 /// Covers the authorization-sensitive paths of VaultService specifically - not full coverage.
 /// A bug here means one user's encrypted vault (bank credentials, etc.) leaking to another user,
-/// so these are the cases that matter most: cross-user access, self-targeting, and revocation.
+/// so these are the cases that matter most: cross-user access, self-targeting, revocation, and
+/// (since sharing added an email verification gate) whether an unverified share is truly inert.
 /// </summary>
 public class VaultServiceTests
 {
-    private static (FakeVaultRepository Repo, UserManager<ApplicationUser> Users, VaultService Service) CreateService()
+    private static (FakeVaultRepository Repo, UserManager<ApplicationUser> Users, VaultService Service, FakeEmailSender Email) CreateService(
+        VaultShareCodesOptions? shareCodesOptions = null)
     {
         var store = new FakeUserStore();
         var userManager = new UserManager<ApplicationUser>(
@@ -29,7 +32,11 @@ public class VaultServiceTests
             NullLogger<UserManager<ApplicationUser>>.Instance);
 
         var repo = new FakeVaultRepository();
-        return (repo, userManager, new VaultService(repo, userManager));
+        var email = new FakeEmailSender();
+        var service = new VaultService(
+            repo, userManager, new FakeHotpService(), email,
+            Microsoft.Extensions.Options.Options.Create(shareCodesOptions ?? new VaultShareCodesOptions()));
+        return (repo, userManager, service, email);
     }
 
     private static async Task<ApplicationUser> CreateUserAsync(UserManager<ApplicationUser> userManager, string email, string first = "Test", string last = "User")
@@ -53,7 +60,7 @@ public class VaultServiceTests
     [Fact]
     public async Task SetupAsync_Fails_WhenAlreadySetUp()
     {
-        var (_, _, service) = CreateService();
+        var (_, _, service, _) = CreateService();
         var userId = Guid.NewGuid();
         await SetUpVaultAsync(service, userId);
 
@@ -65,7 +72,7 @@ public class VaultServiceTests
     [Fact]
     public async Task GetItemAsync_Fails_ForNonOwner()
     {
-        var (repo, _, service) = CreateService();
+        var (repo, _, service, _) = CreateService();
         var ownerId = Guid.NewGuid();
         var attackerId = Guid.NewGuid();
         var item = new VaultItem { Id = Guid.NewGuid(), OwnerUserId = ownerId, CiphertextBlob = "secret" };
@@ -79,7 +86,7 @@ public class VaultServiceTests
     [Fact]
     public async Task UpdateItemAsync_Fails_ForNonOwner()
     {
-        var (repo, _, service) = CreateService();
+        var (repo, _, service, _) = CreateService();
         var ownerId = Guid.NewGuid();
         var attackerId = Guid.NewGuid();
         var item = new VaultItem { Id = Guid.NewGuid(), OwnerUserId = ownerId, CiphertextBlob = "secret" };
@@ -94,7 +101,7 @@ public class VaultServiceTests
     [Fact]
     public async Task DeleteItemAsync_Fails_ForNonOwner()
     {
-        var (repo, _, service) = CreateService();
+        var (repo, _, service, _) = CreateService();
         var ownerId = Guid.NewGuid();
         var attackerId = Guid.NewGuid();
         var item = new VaultItem { Id = Guid.NewGuid(), OwnerUserId = ownerId, CiphertextBlob = "secret" };
@@ -109,7 +116,7 @@ public class VaultServiceTests
     [Fact]
     public async Task CreateShareAsync_Fails_WhenTargetIsSelf()
     {
-        var (_, users, service) = CreateService();
+        var (_, users, service, _) = CreateService();
         var owner = await CreateUserAsync(users, "owner@example.com");
         await SetUpVaultAsync(service, owner.Id);
 
@@ -121,7 +128,7 @@ public class VaultServiceTests
     [Fact]
     public async Task CreateShareAsync_Fails_WhenTargetHasNoVault()
     {
-        var (_, users, service) = CreateService();
+        var (_, users, service, _) = CreateService();
         var owner = await CreateUserAsync(users, "owner@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await CreateUserAsync(users, "novault@example.com");
@@ -134,7 +141,7 @@ public class VaultServiceTests
     [Fact]
     public async Task CreateShareAsync_Fails_WhenOwnerHasNoVault()
     {
-        var (_, users, service) = CreateService();
+        var (_, users, service, _) = CreateService();
         var owner = await CreateUserAsync(users, "owner@example.com");
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, holder.Id);
@@ -147,7 +154,7 @@ public class VaultServiceTests
     [Fact]
     public async Task CreateShareAsync_ReplacesExistingActiveShare()
     {
-        var (repo, users, service) = CreateService();
+        var (repo, users, service, _) = CreateService();
         var owner = await CreateUserAsync(users, "owner@example.com");
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
@@ -166,7 +173,7 @@ public class VaultServiceTests
     [Fact]
     public async Task RevokeShareAsync_Fails_WhenCallerIsNotTheGrantingOwner()
     {
-        var (repo, users, service) = CreateService();
+        var (repo, users, service, _) = CreateService();
         var owner = await CreateUserAsync(users, "owner@example.com");
         var holder = await CreateUserAsync(users, "holder@example.com");
         var attacker = await CreateUserAsync(users, "attacker@example.com");
@@ -183,7 +190,7 @@ public class VaultServiceTests
     [Fact]
     public async Task RevokeShareAsync_Fails_ForSelfShareRow()
     {
-        var (repo, users, service) = CreateService();
+        var (repo, users, service, _) = CreateService();
         var owner = await CreateUserAsync(users, "owner@example.com");
         await SetUpVaultAsync(service, owner.Id);
         var selfShare = repo.Shares.Single(s => s.VaultOwnerUserId == owner.Id && s.HolderUserId == owner.Id);
@@ -197,13 +204,15 @@ public class VaultServiceTests
     [Fact]
     public async Task GetSharedItemsAsync_Fails_AfterRevocation()
     {
-        var (_, users, service) = CreateService();
+        var (_, users, service, email) = CreateService();
         var owner = await CreateUserAsync(users, "owner@example.com");
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
         var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
         await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext"), CancellationToken.None);
+        var sentCode = email.VaultShareCodesSent.Single(c => c.ToEmail == "holder@example.com").Code;
+        await service.VerifyShareAsync(holder.Id, share.Data!.Id, sentCode, CancellationToken.None);
 
         var beforeRevoke = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
         await service.RevokeShareAsync(owner.Id, share.Data!.Id, CancellationToken.None);
@@ -217,7 +226,7 @@ public class VaultServiceTests
     [Fact]
     public async Task RewrapMasterKeyAsync_Fails_WhenNoVault()
     {
-        var (_, _, service) = CreateService();
+        var (_, _, service, _) = CreateService();
 
         var result = await service.RewrapMasterKeyAsync(Guid.NewGuid(), new VaultRewrapDto("newSalt", 700_000, "newWrapped"), CancellationToken.None);
 
@@ -227,7 +236,7 @@ public class VaultServiceTests
     [Fact]
     public async Task RewrapMasterKeyAsync_UpdatesProfile_WhenVaultExists()
     {
-        var (repo, _, service) = CreateService();
+        var (repo, _, service, _) = CreateService();
         var userId = Guid.NewGuid();
         await SetUpVaultAsync(service, userId);
 
@@ -238,5 +247,130 @@ public class VaultServiceTests
         Assert.Equal("newSalt", profile.KdfSalt);
         Assert.Equal(700_000, profile.KdfIterations);
         Assert.Equal("newWrapped", profile.PrivateKeyWrappedByMasterKey);
+    }
+
+    [Fact]
+    public async Task GetSharedItemsAsync_Fails_WhenShareNotYetVerified()
+    {
+        var (_, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext"), CancellationToken.None);
+
+        var result = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task GetSharedWithMeAsync_HidesWrappedUvk_UntilVerified()
+    {
+        var (_, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+
+        var result = await service.GetSharedWithMeAsync(holder.Id, CancellationToken.None);
+
+        var dto = Assert.Single(result.Data!);
+        Assert.Null(dto.WrappedUvk);
+        Assert.Equal(VaultShareStatus.Pending, dto.Status);
+    }
+
+    [Fact]
+    public async Task VerifyShareAsync_GrantsAccess_WithCorrectCode()
+    {
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext"), CancellationToken.None);
+        var sentCode = email.VaultShareCodesSent.Single().Code;
+
+        var verify = await service.VerifyShareAsync(holder.Id, share.Data!.Id, sentCode, CancellationToken.None);
+        var items = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
+
+        Assert.True(verify.Succeeded);
+        Assert.True(items.Succeeded);
+        Assert.Single(items.Data!);
+    }
+
+    [Fact]
+    public async Task VerifyShareAsync_Fails_WithWrongCode()
+    {
+        var (_, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+
+        var result = await service.VerifyShareAsync(holder.Id, share.Data!.Id, "000000", CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task VerifyShareAsync_Fails_ForNonHolder()
+    {
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        var attacker = await CreateUserAsync(users, "attacker@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var sentCode = email.VaultShareCodesSent.Single().Code;
+
+        var result = await service.VerifyShareAsync(attacker.Id, share.Data!.Id, sentCode, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task VerifyShareAsync_PermanentlyFails_AfterMaxAttempts()
+    {
+        var (_, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+
+        for (var i = 0; i < new VaultShareCodesOptions().MaxAttempts; i++)
+        {
+            await service.VerifyShareAsync(holder.Id, share.Data!.Id, "000000", CancellationToken.None);
+        }
+
+        var status = (await service.GetSharesAsync(owner.Id, CancellationToken.None)).Data!.Single(s => s.Id == share.Data!.Id).Status;
+        Assert.Equal(VaultShareStatus.Failed, status);
+    }
+
+    [Fact]
+    public async Task ResendShareCodeAsync_IssuesNewCode_AndResetsAttempts()
+    {
+        var (_, users, service, email) = CreateService(new VaultShareCodesOptions { ResendCooldownSeconds = 0 });
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var firstCode = email.VaultShareCodesSent.Single().Code;
+        await service.VerifyShareAsync(holder.Id, share.Data!.Id, "000000", CancellationToken.None);
+
+        var resend = await service.ResendShareCodeAsync(holder.Id, share.Data!.Id, CancellationToken.None);
+        var secondCode = email.VaultShareCodesSent.Last().Code;
+        var verify = await service.VerifyShareAsync(holder.Id, share.Data!.Id, secondCode, CancellationToken.None);
+
+        Assert.True(resend.Succeeded);
+        Assert.NotEqual(firstCode, secondCode);
+        Assert.True(verify.Succeeded);
     }
 }

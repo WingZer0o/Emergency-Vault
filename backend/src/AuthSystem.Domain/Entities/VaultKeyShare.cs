@@ -25,4 +25,26 @@ public class VaultKeyShare
 
     /// <summary>Soft-revoke marker; null means the grant is active. Preserved (not deleted) as an audit trail of who had access when.</summary>
     public DateTimeOffset? RevokedAt { get; set; }
+
+    /// <summary>
+    /// Email verification gate on top of RevokedAt: null means the holder hasn't entered the emailed
+    /// code yet, so WrappedUvk must not be handed out and shared items must not be readable. Always
+    /// set at creation time for the self-share row - only cross-user shares go through the code flow.
+    /// </summary>
+    public DateTimeOffset? VerifiedAt { get; set; }
+
+    /// <summary>base64 20-byte HOTP secret for this share's verification code. Null once verified - never needed again.</summary>
+    public string? VerificationSecret { get; set; }
+
+    /// <summary>HOTP counter, bumped every time a code is issued or resent. Never reused once a code has gone out.</summary>
+    public long VerificationCounter { get; set; }
+
+    /// <summary>Wrong-code attempts against the current code. Hitting MaxAttempts kills the share permanently - no further resend.</summary>
+    public int VerificationAttempts { get; set; }
+
+    /// <summary>When the current code goes stale; a resend issues a new one and extends this.</summary>
+    public DateTimeOffset? VerificationCodeExpiresAt { get; set; }
+
+    /// <summary>Anchor for the resend cooldown.</summary>
+    public DateTimeOffset? VerificationCodeSentAt { get; set; }
 }

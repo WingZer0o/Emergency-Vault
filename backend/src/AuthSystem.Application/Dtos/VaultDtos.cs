@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace AuthSystem.Application.Dtos;
 
@@ -38,6 +39,11 @@ public record CreateVaultShareRequest(
     [Required, EmailAddress] string HolderEmail,
     [Required] string WrappedUvk);
 
-public record VaultShareDto(Guid Id, Guid HolderUserId, string HolderName, string HolderEmail, DateTimeOffset GrantedAt);
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum VaultShareStatus { Pending, Active, CodeExpired, Failed }
 
-public record VaultSharedWithMeDto(Guid OwnerUserId, string OwnerName, string OwnerEmail, string WrappedUvk, DateTimeOffset GrantedAt);
+public record VaultShareDto(Guid Id, Guid HolderUserId, string HolderName, string HolderEmail, DateTimeOffset GrantedAt, VaultShareStatus Status);
+
+public record VaultSharedWithMeDto(Guid Id, Guid OwnerUserId, string OwnerName, string OwnerEmail, string? WrappedUvk, DateTimeOffset GrantedAt, VaultShareStatus Status);
+
+public record VerifyVaultShareRequest([Required, StringLength(6, MinimumLength = 6)] string Code);

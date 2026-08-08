@@ -128,6 +128,22 @@ public class VaultController(IVaultService vaultService) : ControllerBase
         return result.Succeeded ? NoContent() : NotFound(new { errors = result.Errors });
     }
 
+    [HttpPost("shares/{id:guid}/verify")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> VerifyShare(Guid id, VerifyVaultShareRequest request, CancellationToken ct)
+    {
+        var result = await vaultService.VerifyShareAsync(User.GetUserId(), id, request.Code, ct);
+        return result.Succeeded ? Ok(new { message = "Vault access verified." }) : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("shares/{id:guid}/resend-code")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> ResendShareCode(Guid id, CancellationToken ct)
+    {
+        var result = await vaultService.ResendShareCodeAsync(User.GetUserId(), id, ct);
+        return result.Succeeded ? Ok(new { message = "Code resent." }) : BadRequest(new { errors = result.Errors });
+    }
+
     [HttpGet("shared-with-me")]
     [Authorize(Roles = "User")]
     public async Task<IActionResult> SharedWithMe(CancellationToken ct)

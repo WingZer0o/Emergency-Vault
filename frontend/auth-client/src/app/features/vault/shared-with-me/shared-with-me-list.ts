@@ -1,21 +1,34 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { VaultSharedWithMeDto } from '../../../core/models/vault.models';
+import { VaultShareStatus, VaultSharedWithMeDto } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 
 @Component({
   selector: 'app-shared-with-me-list',
-  imports: [RouterLink, MatCardModule, MatButtonModule, MatListModule, MatProgressSpinnerModule],
+  imports: [
+    RouterLink,
+    ReactiveFormsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatListModule,
+    MatProgressSpinnerModule,
+  ],
   templateUrl: './shared-with-me-list.html',
   styleUrl: './shared-with-me-list.scss',
 })
 export class SharedWithMeList implements OnInit {
+  private readonly fb = inject(FormBuilder);
   private readonly vaultService = inject(VaultService);
   private readonly router = inject(Router);
 
@@ -23,7 +36,81 @@ export class SharedWithMeList implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly shares = signal<VaultSharedWithMeDto[]>([]);
 
+  /** Which share's inline "enter code" form is currently open, if any. */
+  readonly verifyingId = signal<string | null>(null);
+  readonly verifying = signal(false);
+  readonly verifyError = signal<string | null>(null);
+  readonly resendMessage = signal<string | null>(null);
+
+  readonly codeForm = this.fb.nonNullable.group({
+    code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
+  });
+
   ngOnInit(): void {
+    this.loadShares();
+  }
+
+  statusLabel(status: VaultShareStatus): string {
+    switch (status) {
+      case 'Active':
+        return 'Ready to open';
+      case 'Pending':
+        return 'Enter the code we emailed you';
+      case 'CodeExpired':
+        return 'Code expired - resend to try again';
+      case 'Failed':
+        return 'Too many attempts - ask them to share again';
+    }
+  }
+
+  onItemClick(share: VaultSharedWithMeDto): void {
+    if (share.status === 'Active') {
+      this.router.navigateByUrl(`/vault/shared-with-me/${share.ownerUserId}`);
+      return;
+    }
+    if (share.status === 'Failed') {
+      return;
+    }
+    this.verifyingId.set(this.verifyingId() === share.id ? null : share.id);
+    this.verifyError.set(null);
+    this.resendMessage.set(null);
+    this.codeForm.reset();
+  }
+
+  submitCode(shareId: string): void {
+    if (this.codeForm.invalid) {
+      this.codeForm.markAllAsTouched();
+      return;
+    }
+
+    this.verifying.set(true);
+    this.verifyError.set(null);
+    const code = this.codeForm.getRawValue().code;
+
+    this.vaultService.verifyShare(shareId, { code }).subscribe({
+      next: () => {
+        this.verifying.set(false);
+        this.verifyingId.set(null);
+        this.loadShares();
+      },
+      error: (err) => {
+        this.verifying.set(false);
+        this.verifyError.set(extractErrorMessage(err, 'Incorrect code.'));
+      },
+    });
+  }
+
+  resendCode(shareId: string): void {
+    this.verifyError.set(null);
+    this.resendMessage.set(null);
+    this.vaultService.resendShareCode(shareId).subscribe({
+      next: () => this.resendMessage.set('A new code has been sent.'),
+      error: (err) => this.verifyError.set(extractErrorMessage(err, 'Could not resend code.')),
+    });
+  }
+
+  private loadShares(): void {
+    this.loading.set(true);
     this.vaultService.getSharedWithMe().subscribe({
       next: (shares) => {
         this.shares.set(shares);
@@ -34,9 +121,5 @@ export class SharedWithMeList implements OnInit {
         this.errorMessage.set(extractErrorMessage(err, 'Could not load vaults shared with you.'));
       },
     });
-  }
-
-  open(ownerUserId: string): void {
-    this.router.navigateByUrl(`/vault/shared-with-me/${ownerUserId}`);
   }
 }

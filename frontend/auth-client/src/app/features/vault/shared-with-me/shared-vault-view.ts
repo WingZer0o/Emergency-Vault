@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
@@ -21,6 +21,7 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
 })
 export class SharedVaultView implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly vaultService = inject(VaultService);
   private readonly vaultSession = inject(VaultSessionService);
 
@@ -41,6 +42,11 @@ export class SharedVaultView implements OnInit {
         return;
       }
       this.ownerName.set(share.ownerName);
+
+      if (!share.wrappedUvk) {
+        this.router.navigateByUrl('/vault/shared-with-me');
+        return;
+      }
 
       const uvk = await this.vaultSession.unwrapSharedUvk(share.wrappedUvk);
       const dtos = await firstValueFrom(this.vaultService.getSharedItems(this.ownerUserId));
