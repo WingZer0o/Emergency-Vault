@@ -13,6 +13,31 @@
     </mat-card-content>
   </mat-card>
 
+  <mat-card class="security-card">
+    <mat-card-header>
+      <mat-card-title>Security</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (twoFactorLoading()) {
+        <mat-progress-spinner diameter="28" mode="indeterminate" />
+      } @else {
+        <mat-slide-toggle
+          [checked]="twoFactorEnabled()"
+          [disabled]="twoFactorSaving()"
+          (change)="onTwoFactorToggle($event)"
+        >
+          Email two-factor authentication
+        </mat-slide-toggle>
+        <p class="hint-text">
+          When enabled, we'll email you a verification code each time you sign in.
+        </p>
+        @if (twoFactorError(); as message) {
+          <p class="error-text">{{ message }}</p>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+
   @if (authService.hasRole('Admin')) {
     <mat-card class="admin-card">
       <mat-card-header>

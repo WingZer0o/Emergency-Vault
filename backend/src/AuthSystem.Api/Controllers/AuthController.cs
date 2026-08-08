@@ -31,8 +31,38 @@ public class AuthController(IAuthService authService) : ControllerBase
             return Unauthorized(new { errors = result.Errors });
         }
 
+        if (result.Data.RequiresTwoFactor)
+        {
+            return Ok(new { requiresTwoFactor = true, twoFactorToken = result.Data.TwoFactorToken });
+        }
+
+        SetRefreshCookie(result.Data.Auth!.RefreshToken, result.Data.Auth.RefreshTokenExpiresAt);
+        return Ok(ToAuthResponse(result.Data.Auth));
+    }
+
+    [HttpPost("login/two-factor")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyTwoFactor(VerifyTwoFactorRequest request, CancellationToken ct)
+    {
+        var result = await authService.VerifyTwoFactorAsync(
+            request.TwoFactorToken, request.Code, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
+        if (!result.Succeeded || result.Data is null)
+        {
+            return Unauthorized(new { errors = result.Errors });
+        }
+
         SetRefreshCookie(result.Data.RefreshToken, result.Data.RefreshTokenExpiresAt);
         return Ok(ToAuthResponse(result.Data));
+    }
+
+    [HttpPost("login/two-factor/resend")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResendTwoFactor(ResendTwoFactorRequest request, CancellationToken ct)
+    {
+        var result = await authService.ResendTwoFactorCodeAsync(request.TwoFactorToken, ct);
+        return result.Succeeded
+            ? Ok(new { message = "A new code has been sent." })
+            : BadRequest(new { errors = result.Errors });
     }
 
     [HttpPost("refresh")]
@@ -102,6 +132,34 @@ public class AuthController(IAuthService authService) : ControllerBase
         return profile is null ? NotFound() : Ok(profile);
     }
 
+    [HttpGet("two-factor/status")]
+    [Authorize]
+    public async Task<IActionResult> TwoFactorStatus(CancellationToken ct)
+    {
+        var enabled = await authService.GetTwoFactorStatusAsync(User.GetUserId(), ct);
+        return Ok(new { enabled });
+    }
+
+    [HttpPost("two-factor/enable")]
+    [Authorize]
+    public async Task<IActionResult> EnableTwoFactor(CancellationToken ct)
+    {
+        var result = await authService.EnableTwoFactorAsync(User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(new { message = "Two-factor authentication enabled." })
+            : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("two-factor/disable")]
+    [Authorize]
+    public async Task<IActionResult> DisableTwoFactor(CancellationToken ct)
+    {
+        var result = await authService.DisableTwoFactorAsync(User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(new { message = "Two-factor authentication disabled." })
+            : BadRequest(new { errors = result.Errors });
+    }
+
     private void SetRefreshCookie(string token, DateTimeOffset expiresAt)
     {
         Response.Cookies.Append(CookieConst.RefreshCookieName, token, new CookieOptions
@@ -116,6 +174,7 @@ public class AuthController(IAuthService authService) : ControllerBase
 
     private static object ToAuthResponse(AuthResult result) => new
     {
+        requiresTwoFactor = false,
         accessToken = result.AccessToken,
         accessTokenExpiresAt = result.AccessTokenExpiresAt,
         user = result.User,

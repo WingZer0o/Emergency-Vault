@@ -31,10 +31,15 @@ export class Login {
 
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly twoFactorToken = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
+  });
+
+  readonly codeForm = this.fb.nonNullable.group({
+    code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
   });
 
   submit(): void {
@@ -47,14 +52,58 @@ export class Login {
     this.errorMessage.set(null);
 
     this.authService.login(this.form.getRawValue()).subscribe({
-      next: () => {
+      next: (response) => {
         this.loading.set(false);
-        this.router.navigateByUrl('/dashboard');
+        if (response.requiresTwoFactor) {
+          this.twoFactorToken.set(response.twoFactorToken);
+        } else {
+          this.router.navigateByUrl('/dashboard');
+        }
       },
       error: (err) => {
         this.loading.set(false);
         this.errorMessage.set(extractErrorMessage(err, 'Login failed.'));
       },
     });
+  }
+
+  submitCode(): void {
+    const token = this.twoFactorToken();
+    if (!token || this.codeForm.invalid) {
+      this.codeForm.markAllAsTouched();
+      return;
+    }
+
+    this.loading.set(true);
+    this.errorMessage.set(null);
+
+    this.authService.verifyTwoFactor({ twoFactorToken: token, code: this.codeForm.getRawValue().code }).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.router.navigateByUrl('/dashboard');
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.errorMessage.set(extractErrorMessage(err, 'Incorrect code.'));
+      },
+    });
+  }
+
+  resendCode(): void {
+    const token = this.twoFactorToken();
+    if (!token) {
+      return;
+    }
+
+    this.errorMessage.set(null);
+    this.authService.resendTwoFactorCode(token).subscribe({
+      error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not resend code.')),
+    });
+  }
+
+  cancelTwoFactor(): void {
+    this.twoFactorToken.set(null);
+    this.codeForm.reset();
+    this.errorMessage.set(null);
   }
 }

@@ -38,6 +38,19 @@ public class EmailJobs
         await SendEmailAsync(body);
     }
 
+    public async Task SendTwoFactorCodeAsync(string toEmail, string code)
+    {
+        EmailRequestBody body = new EmailRequestBody()
+        {
+            From = "support@mtmulch.com",
+            To = new List<string> { toEmail },
+            Subject = "Your verification code",
+            Html = $"<p>Your verification code is <strong>{code}</strong>. It expires in 10 minutes.</p>" +
+                   "<p>If you didn't try to sign in, you can ignore this email.</p>"
+        };
+        await SendEmailAsync(body);
+    }
+
     private async Task<bool> SendEmailAsync(EmailRequestBody body)
     {
         HttpClientSingleton httpClient = HttpClientSingleton.Instance;

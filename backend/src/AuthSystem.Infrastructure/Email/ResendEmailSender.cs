@@ -20,4 +20,10 @@ public class ResendEmailSender(IBackgroundJobClient backgroundJobClient) : IEmai
         backgroundJobClient.Enqueue<EmailJobs>(job => job.SendPasswordResetAsync(toEmail, resetLink));
         return Task.CompletedTask;
     }
+
+    public Task SendTwoFactorCodeAsync(string toEmail, string code, CancellationToken ct)
+    {
+        backgroundJobClient.Enqueue<EmailJobs>(job => job.SendTwoFactorCodeAsync(toEmail, code));
+        return Task.CompletedTask;
+    }
 }

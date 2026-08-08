@@ -7,9 +7,11 @@ import {
   AuthResponse,
   ForgotPasswordRequest,
   LoginRequest,
+  LoginResponse,
   RegisterRequest,
   ResetPasswordRequest,
   UserProfile,
+  VerifyTwoFactorRequest,
 } from '../models/auth.models';
 
 /**
@@ -40,10 +42,36 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${this.baseUrl}/register`, request);
   }
 
-  login(request: LoginRequest): Observable<AuthResponse> {
+  login(request: LoginRequest): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.baseUrl}/login`, request).pipe(
+      tap((response) => {
+        if (!response.requiresTwoFactor) {
+          this.setSession(response);
+        }
+      }),
+    );
+  }
+
+  verifyTwoFactor(request: VerifyTwoFactorRequest): Observable<AuthResponse> {
     return this.http
-      .post<AuthResponse>(`${this.baseUrl}/login`, request)
+      .post<AuthResponse>(`${this.baseUrl}/login/two-factor`, request)
       .pipe(tap((response) => this.setSession(response)));
+  }
+
+  resendTwoFactorCode(twoFactorToken: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/login/two-factor/resend`, { twoFactorToken });
+  }
+
+  getTwoFactorStatus(): Observable<{ enabled: boolean }> {
+    return this.http.get<{ enabled: boolean }>(`${this.baseUrl}/two-factor/status`);
+  }
+
+  enableTwoFactor(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/two-factor/enable`, {});
+  }
+
+  disableTwoFactor(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/two-factor/disable`, {});
   }
 
   refresh(): Observable<AuthResponse> {

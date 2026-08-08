@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using AuthSystem.Application.Dtos;
 using AuthSystem.Application.Interfaces;
 using AuthSystem.Application.Options;
@@ -12,6 +13,8 @@ public class AuthService(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
+    IHotpService hotpService,
+    ITwoFactorChallengeCache twoFactorChallengeCache,
     IRefreshTokenRepository refreshTokenRepository,
     IRefreshTokenCache refreshTokenCache,
     IEmailSender emailSender,
@@ -19,6 +22,10 @@ public class AuthService(
     IOptions<FrontendOptions> frontendOptions,
     ILogger<AuthService> logger) : IAuthService
 {
+    private const int TwoFactorCodeDigits = 6;
+    private const int MaxTwoFactorAttempts = 5;
+    private static readonly TimeSpan TwoFactorChallengeTtl = TimeSpan.FromMinutes(10);
+
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private readonly FrontendOptions _frontendOptions = frontendOptions.Value;
 
@@ -53,17 +60,17 @@ public class AuthService(
         return ServiceResult.Success();
     }
 
-    public async Task<ServiceResult<AuthResult>> LoginAsync(LoginRequest request, string? ipAddress, CancellationToken ct)
+    public async Task<ServiceResult<LoginResult>> LoginAsync(LoginRequest request, string? ipAddress, CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(request.Email);
         if (user is null)
         {
-            return ServiceResult<AuthResult>.Failure("Invalid email or password.");
+            return ServiceResult<LoginResult>.Failure("Invalid email or password.");
         }
 
         if (!await userManager.IsEmailConfirmedAsync(user))
         {
-            return ServiceResult<AuthResult>.Failure("Email has not been confirmed yet.");
+            return ServiceResult<LoginResult>.Failure("Email has not been confirmed yet.");
         }
 
         var signInResult = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
@@ -72,11 +79,131 @@ public class AuthService(
             var message = signInResult.IsLockedOut
                 ? "Account is temporarily locked due to repeated failed attempts."
                 : "Invalid email or password.";
-            return ServiceResult<AuthResult>.Failure(message);
+            return ServiceResult<LoginResult>.Failure(message);
+        }
+
+        if (user.TwoFactorEnabled && !string.IsNullOrEmpty(user.TwoFactorSecret))
+        {
+            var counter = await IssueTwoFactorCodeAsync(user, ct);
+            var challengeToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            await twoFactorChallengeCache.SetAsync(challengeToken, new TwoFactorChallenge(user.Id, counter, 0), TwoFactorChallengeTtl, ct);
+
+            return ServiceResult<LoginResult>.Success(new LoginResult(true, challengeToken, null));
         }
 
         var result = await IssueTokenPairAsync(user, ipAddress, ct);
+        return ServiceResult<LoginResult>.Success(new LoginResult(false, null, result));
+    }
+
+    public async Task<ServiceResult<AuthResult>> VerifyTwoFactorAsync(string challengeToken, string code, string? ipAddress, CancellationToken ct)
+    {
+        var challenge = await twoFactorChallengeCache.GetAsync(challengeToken, ct);
+        if (challenge is null)
+        {
+            return ServiceResult<AuthResult>.Failure("Invalid or expired code. Please log in again.");
+        }
+
+        var user = await userManager.FindByIdAsync(challenge.UserId.ToString());
+        if (user is null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
+        {
+            await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult<AuthResult>.Failure("Invalid or expired code. Please log in again.");
+        }
+
+        var secret = Convert.FromBase64String(user.TwoFactorSecret);
+        var expectedCode = hotpService.GenerateCode(secret, challenge.Counter, TwoFactorCodeDigits);
+
+        if (!CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(code),
+                System.Text.Encoding.UTF8.GetBytes(expectedCode)))
+        {
+            if (challenge.Attempts + 1 >= MaxTwoFactorAttempts)
+            {
+                await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+                return ServiceResult<AuthResult>.Failure("Too many incorrect attempts. Please log in again.");
+            }
+
+            await twoFactorChallengeCache.SetAsync(
+                challengeToken, challenge with { Attempts = challenge.Attempts + 1 }, TwoFactorChallengeTtl, ct);
+            return ServiceResult<AuthResult>.Failure("Incorrect code.");
+        }
+
+        await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+        var result = await IssueTokenPairAsync(user, ipAddress, ct);
         return ServiceResult<AuthResult>.Success(result);
+    }
+
+    public async Task<ServiceResult> ResendTwoFactorCodeAsync(string challengeToken, CancellationToken ct)
+    {
+        var challenge = await twoFactorChallengeCache.GetAsync(challengeToken, ct);
+        if (challenge is null)
+        {
+            return ServiceResult.Failure("Invalid or expired code. Please log in again.");
+        }
+
+        var user = await userManager.FindByIdAsync(challenge.UserId.ToString());
+        if (user is null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
+        {
+            await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult.Failure("Invalid or expired code. Please log in again.");
+        }
+
+        var counter = await IssueTwoFactorCodeAsync(user, ct);
+        await twoFactorChallengeCache.SetAsync(challengeToken, challenge with { Counter = counter, Attempts = 0 }, TwoFactorChallengeTtl, ct);
+
+        return ServiceResult.Success();
+    }
+
+    public async Task<bool> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        return user?.TwoFactorEnabled ?? false;
+    }
+
+    public async Task<ServiceResult> EnableTwoFactorAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ServiceResult.Failure("User not found.");
+        }
+
+        if (string.IsNullOrEmpty(user.TwoFactorSecret))
+        {
+            user.TwoFactorSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(20));
+            user.TwoFactorCounter = 0;
+        }
+
+        var result = await userManager.SetTwoFactorEnabledAsync(user, true);
+        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<ServiceResult> DisableTwoFactorAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ServiceResult.Failure("User not found.");
+        }
+
+        user.TwoFactorSecret = null;
+        user.TwoFactorCounter = 0;
+
+        var result = await userManager.SetTwoFactorEnabledAsync(user, false);
+        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    /// <summary>Advances the user's HOTP counter, generates the code for it, emails it, and persists the new counter.</summary>
+    private async Task<long> IssueTwoFactorCodeAsync(ApplicationUser user, CancellationToken ct)
+    {
+        user.TwoFactorCounter += 1;
+        await userManager.UpdateAsync(user);
+
+        var secret = Convert.FromBase64String(user.TwoFactorSecret!);
+        var code = hotpService.GenerateCode(secret, user.TwoFactorCounter, TwoFactorCodeDigits);
+        await emailSender.SendTwoFactorCodeAsync(user.Email!, code, ct);
+
+        return user.TwoFactorCounter;
     }
 
     public async Task<ServiceResult<AuthResult>> RefreshAsync(string rawRefreshToken, string? ipAddress, CancellationToken ct)

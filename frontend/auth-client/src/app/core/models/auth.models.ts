@@ -7,9 +7,22 @@ export interface UserProfile {
 }
 
 export interface AuthResponse {
+  requiresTwoFactor: false;
   accessToken: string;
   accessTokenExpiresAt: string;
   user: UserProfile;
+}
+
+export interface TwoFactorChallengeResponse {
+  requiresTwoFactor: true;
+  twoFactorToken: string;
+}
+
+export type LoginResponse = AuthResponse | TwoFactorChallengeResponse;
+
+export interface VerifyTwoFactorRequest {
+  twoFactorToken: string;
+  code: string;
 }
 
 export interface RegisterRequest {

@@ -73,6 +73,9 @@ public static class DependencyInjection
         // project in Program.cs (loaded once there and shared with JWT Bearer validation).
         services.AddSingleton<ITokenService, TokenService>();
 
+        services.AddSingleton<IHotpService, HotpService>();
+        services.AddSingleton<ITwoFactorChallengeCache, RedisTwoFactorChallengeCache>();
+
         return services;
     }
 }

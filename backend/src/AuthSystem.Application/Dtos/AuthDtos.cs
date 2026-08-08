@@ -27,3 +27,12 @@ public record AuthResult(
     string RefreshToken,
     DateTimeOffset RefreshTokenExpiresAt,
     UserProfileDto User);
+
+/// <summary>Result of a login attempt: either a completed sign-in, or a pending email-2FA challenge.</summary>
+public record LoginResult(bool RequiresTwoFactor, string? TwoFactorToken, AuthResult? Auth);
+
+public record VerifyTwoFactorRequest(
+    [Required] string TwoFactorToken,
+    [Required, StringLength(6, MinimumLength = 6)] string Code);
+
+public record ResendTwoFactorRequest([Required] string TwoFactorToken);
