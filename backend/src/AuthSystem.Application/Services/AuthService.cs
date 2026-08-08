@@ -21,15 +21,12 @@ public class AuthService(
     IEmailSender emailSender,
     IOptions<JwtOptions> jwtOptions,
     IOptions<FrontendOptions> frontendOptions,
+    IOptions<Two2FACodesOptions> two2FACodesOptions,
     ILogger<AuthService> logger) : IAuthService
 {
-    private const int TwoFactorCodeDigits = 6;
-    private const int MaxTwoFactorAttempts = 5;
-    private const string UnlockAccountTokenPurpose = "UnlockAccount";
-    private static readonly TimeSpan TwoFactorChallengeTtl = TimeSpan.FromMinutes(10);
-
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private readonly FrontendOptions _frontendOptions = frontendOptions.Value;
+    private readonly Two2FACodesOptions _two2FACodesOptions = two2FACodesOptions.Value;
 
     public async Task<ServiceResult> RegisterAsync(RegisterRequest request, CancellationToken ct)
     {
@@ -98,7 +95,7 @@ public class AuthService(
         {
             var counter = await IssueTwoFactorCodeAsync(user, ct);
             var challengeToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-            await twoFactorChallengeCache.SetAsync(challengeToken, new TwoFactorChallenge(user.Id, counter, 0), TwoFactorChallengeTtl, ct);
+            await twoFactorChallengeCache.SetAsync(challengeToken, new TwoFactorChallenge(user.Id, counter, 0), _two2FACodesOptions.TwoFactorChallengeTtl, ct);
 
             return ServiceResult<LoginResult>.Success(new LoginResult(true, challengeToken, null));
         }
@@ -129,7 +126,7 @@ public class AuthService(
         }
 
         var secret = Convert.FromBase64String(user.TwoFactorSecret);
-        var expectedCode = hotpService.GenerateCode(secret, challenge.Counter, TwoFactorCodeDigits);
+        var expectedCode = hotpService.GenerateCode(secret, challenge.Counter, _two2FACodesOptions.CodeLength);
 
         if (!CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(code), System.Text.Encoding.UTF8.GetBytes(expectedCode)))
         {
@@ -144,14 +141,14 @@ public class AuthService(
 
             await RecordFailedLoginAsync(user.Id, user.Email!, "InvalidTwoFactorCode", ipAddress, ct);
 
-            if (challenge.Attempts + 1 >= MaxTwoFactorAttempts)
+            if (challenge.Attempts + 1 >= _two2FACodesOptions.MaxAttempts)
             {
                 await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
                 return ServiceResult<AuthResult>.Failure("Too many incorrect attempts. Please log in again.");
             }
 
             await twoFactorChallengeCache.SetAsync(
-                challengeToken, challenge with { Attempts = challenge.Attempts + 1 }, TwoFactorChallengeTtl, ct);
+                challengeToken, challenge with { Attempts = challenge.Attempts + 1 }, _two2FACodesOptions.TwoFactorChallengeTtl, ct);
             return ServiceResult<AuthResult>.Failure("Incorrect code.");
         }
 
@@ -177,7 +174,7 @@ public class AuthService(
         }
 
         var counter = await IssueTwoFactorCodeAsync(user, ct);
-        await twoFactorChallengeCache.SetAsync(challengeToken, challenge with { Counter = counter, Attempts = 0 }, TwoFactorChallengeTtl, ct);
+        await twoFactorChallengeCache.SetAsync(challengeToken, challenge with { Counter = counter, Attempts = 0 }, _two2FACodesOptions.TwoFactorChallengeTtl, ct);
 
         return ServiceResult.Success();
     }
@@ -236,7 +233,7 @@ public class AuthService(
 
     private async Task SendAccountLockedEmailAsync(ApplicationUser user, CancellationToken ct)
     {
-        var token = await userManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, UnlockAccountTokenPurpose);
+        var token = await userManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "UnlockAccount");
         var link = $"{Environment.GetEnvironmentVariable("DOMAIN")}/unlock-account?userId={user.Id}&token={Uri.EscapeDataString(token)}";
         await emailSender.SendAccountLockedAsync(user.Email!, link, ct);
     }
@@ -249,7 +246,7 @@ public class AuthService(
             return ServiceResult.Failure("Invalid unlock link.");
         }
 
-        var isValid = await userManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, UnlockAccountTokenPurpose, token);
+        var isValid = await userManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "UnlockAccount", token);
         if (!isValid)
         {
             return ServiceResult.Failure("Invalid or expired unlock link.");
@@ -268,7 +265,7 @@ public class AuthService(
         await userManager.UpdateAsync(user);
 
         var secret = Convert.FromBase64String(user.TwoFactorSecret!);
-        var code = hotpService.GenerateCode(secret, user.TwoFactorCounter, TwoFactorCodeDigits);
+        var code = hotpService.GenerateCode(secret, user.TwoFactorCounter, _two2FACodesOptions.CodeLength);
         await emailSender.SendTwoFactorCodeAsync(user.Email!, code, ct);
 
         return user.TwoFactorCounter;
