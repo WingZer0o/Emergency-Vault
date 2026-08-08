@@ -6,6 +6,18 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <script>
+      // Applies the saved theme mode before first paint so the page doesn't flash the wrong
+      // color scheme; ThemeService takes over once Angular bootstraps. Kept in sync with the
+      // 'theme-mode' key read/written by ThemeService (core/services/theme.service.ts).
+      (function () {
+        try {
+          var mode = localStorage.getItem('theme-mode');
+          document.documentElement.style.colorScheme =
+            mode === 'light' || mode === 'dark' ? mode : 'light dark';
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
