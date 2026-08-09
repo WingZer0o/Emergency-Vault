@@ -38,4 +38,10 @@ public class ResendEmailSender(IBackgroundJobClient backgroundJobClient) : IEmai
         backgroundJobClient.Enqueue<EmailJobs>(job => job.SendVaultShareCodeAsync(toEmail, code, ownerDisplayName));
         return Task.CompletedTask;
     }
+
+    public Task SendSharedVaultAccessCodeAsync(string toEmail, string code, string ownerDisplayName, CancellationToken ct)
+    {
+        backgroundJobClient.Enqueue<EmailJobs>(job => job.SendSharedVaultAccessCodeAsync(toEmail, code, ownerDisplayName));
+        return Task.CompletedTask;
+    }
 }

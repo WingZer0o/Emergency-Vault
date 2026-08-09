@@ -7,4 +7,5 @@ public interface IEmailSender
     Task SendTwoFactorCodeAsync(string toEmail, string code, CancellationToken ct);
     Task SendAccountLockedAsync(string toEmail, string unlockLink, CancellationToken ct);
     Task SendVaultShareCodeAsync(string toEmail, string code, string ownerDisplayName, CancellationToken ct);
+    Task SendSharedVaultAccessCodeAsync(string toEmail, string code, string ownerDisplayName, CancellationToken ct);
 }

@@ -15,6 +15,8 @@ public class VaultService(
     UserManager<ApplicationUser> userManager,
     IHotpService hotpService,
     IEmailSender emailSender,
+    ISharedVaultAccessChallengeCache sharedVaultAccessChallengeCache,
+    ISharedVaultAccessGrantCache sharedVaultAccessGrantCache,
     IOptions<VaultShareCodesOptions> vaultShareCodesOptions) : IVaultService
 {
     private readonly VaultShareCodesOptions _vaultShareCodesOptions = vaultShareCodesOptions.Value;
@@ -334,6 +336,11 @@ public class VaultService(
             return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure("This shared vault hasn't been verified yet.");
         }
 
+        if (holderUserId != vaultOwnerUserId && !await sharedVaultAccessGrantCache.HasValidGrantAsync(holderUserId, vaultOwnerUserId, ct))
+        {
+            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure("Enter the emailed code to view this vault.");
+        }
+
         var items = await vaultRepository.GetItemsByOwnerAsync(vaultOwnerUserId, ct);
         return ServiceResult<IReadOnlyList<VaultItemDto>>.Success(items.Select(ToDto).ToList());
     }
@@ -375,7 +382,6 @@ public class VaultService(
         }
 
         share.VerifiedAt = DateTimeOffset.UtcNow;
-        share.VerificationSecret = null;
         await vaultRepository.SaveChangesAsync(ct);
         return ServiceResult.Success();
     }
@@ -418,6 +424,136 @@ public class VaultService(
         var code = hotpService.GenerateCode(
             Convert.FromBase64String(share.VerificationSecret!), share.VerificationCounter, _vaultShareCodesOptions.CodeLength);
         await emailSender.SendVaultShareCodeAsync(holder.Email!, code, $"{owner.FirstName} {owner.LastName}", ct);
+
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult<SharedVaultAccessChallengeDto>> RequestSharedVaultAccessAsync(Guid holderUserId, Guid ownerUserId, CancellationToken ct)
+    {
+        if (holderUserId == ownerUserId)
+        {
+            // Self-share: the owner viewing their own vault never needs a code.
+            return ServiceResult<SharedVaultAccessChallengeDto>.Success(new SharedVaultAccessChallengeDto(false, null));
+        }
+
+        var share = await vaultRepository.GetActiveShareAsync(ownerUserId, holderUserId, ct);
+        if (share is null || share.VerifiedAt is null)
+        {
+            return ServiceResult<SharedVaultAccessChallengeDto>.Failure("You don't have access to this vault.");
+        }
+
+        if (await sharedVaultAccessGrantCache.HasValidGrantAsync(holderUserId, ownerUserId, ct))
+        {
+            return ServiceResult<SharedVaultAccessChallengeDto>.Success(new SharedVaultAccessChallengeDto(false, null));
+        }
+
+        // Shares accepted before per-session access codes existed never got a long-lived secret -
+        // generate one lazily the first time it's needed.
+        share.VerificationSecret ??= Convert.ToBase64String(RandomNumberGenerator.GetBytes(20));
+
+        var owner = await userManager.FindByIdAsync(ownerUserId.ToString())
+            ?? throw new InvalidOperationException("Vault owner not found.");
+        var holder = await userManager.FindByIdAsync(holderUserId.ToString())
+            ?? throw new InvalidOperationException("Holder not found.");
+
+        share.VerificationCounter += 1;
+        await vaultRepository.SaveChangesAsync(ct);
+
+        var code = hotpService.GenerateCode(
+            Convert.FromBase64String(share.VerificationSecret), share.VerificationCounter, _vaultShareCodesOptions.CodeLength);
+        await emailSender.SendSharedVaultAccessCodeAsync(holder.Email!, code, $"{owner.FirstName} {owner.LastName}", ct);
+
+        var challengeToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        await sharedVaultAccessChallengeCache.SetAsync(
+            challengeToken,
+            new SharedVaultAccessChallenge(holderUserId, ownerUserId, share.Id, share.VerificationCounter, 0, DateTimeOffset.UtcNow),
+            _vaultShareCodesOptions.AccessCodeExpiration,
+            ct);
+
+        return ServiceResult<SharedVaultAccessChallengeDto>.Success(new SharedVaultAccessChallengeDto(true, challengeToken));
+    }
+
+    public async Task<ServiceResult> VerifySharedVaultAccessAsync(Guid holderUserId, string challengeToken, string code, CancellationToken ct)
+    {
+        var challenge = await sharedVaultAccessChallengeCache.GetAsync(challengeToken, ct);
+        if (challenge is null || challenge.HolderUserId != holderUserId)
+        {
+            return ServiceResult.Failure("Invalid or expired code. Request a new one.");
+        }
+
+        if (challenge.Attempts >= _vaultShareCodesOptions.MaxAttempts)
+        {
+            await sharedVaultAccessChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult.Failure("Too many incorrect attempts. Request a new code.");
+        }
+
+        var share = await vaultRepository.GetShareByIdAsync(challenge.ShareId, ct);
+        if (share is null || share.RevokedAt is not null || share.VerificationSecret is null)
+        {
+            await sharedVaultAccessChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult.Failure("Invalid or expired code. Request a new one.");
+        }
+
+        var expectedCode = hotpService.GenerateCode(
+            Convert.FromBase64String(share.VerificationSecret), challenge.Counter, _vaultShareCodesOptions.CodeLength);
+
+        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(code), Encoding.UTF8.GetBytes(expectedCode)))
+        {
+            var attempts = challenge.Attempts + 1;
+            if (attempts >= _vaultShareCodesOptions.MaxAttempts)
+            {
+                await sharedVaultAccessChallengeCache.RemoveAsync(challengeToken, ct);
+                return ServiceResult.Failure("Too many incorrect attempts. Request a new code.");
+            }
+
+            await sharedVaultAccessChallengeCache.SetAsync(
+                challengeToken, challenge with { Attempts = attempts }, _vaultShareCodesOptions.AccessCodeExpiration, ct);
+            return ServiceResult.Failure("Incorrect code.");
+        }
+
+        await sharedVaultAccessGrantCache.GrantAsync(holderUserId, challenge.OwnerUserId, _vaultShareCodesOptions.SessionTtl, ct);
+        await sharedVaultAccessChallengeCache.RemoveAsync(challengeToken, ct);
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult> ResendSharedVaultAccessCodeAsync(Guid holderUserId, string challengeToken, CancellationToken ct)
+    {
+        var challenge = await sharedVaultAccessChallengeCache.GetAsync(challengeToken, ct);
+        if (challenge is null || challenge.HolderUserId != holderUserId)
+        {
+            return ServiceResult.Failure("Invalid or expired code. Request a new one.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (now - challenge.SentAt < _vaultShareCodesOptions.ResendCooldown)
+        {
+            return ServiceResult.Failure("Please wait a bit before requesting another code.");
+        }
+
+        var share = await vaultRepository.GetShareByIdAsync(challenge.ShareId, ct);
+        if (share is null || share.RevokedAt is not null || share.VerificationSecret is null)
+        {
+            await sharedVaultAccessChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult.Failure("Invalid or expired code. Request a new one.");
+        }
+
+        var owner = await userManager.FindByIdAsync(challenge.OwnerUserId.ToString())
+            ?? throw new InvalidOperationException("Vault owner not found.");
+        var holder = await userManager.FindByIdAsync(holderUserId.ToString())
+            ?? throw new InvalidOperationException("Holder not found.");
+
+        share.VerificationCounter += 1;
+        await vaultRepository.SaveChangesAsync(ct);
+
+        var code = hotpService.GenerateCode(
+            Convert.FromBase64String(share.VerificationSecret), share.VerificationCounter, _vaultShareCodesOptions.CodeLength);
+        await emailSender.SendSharedVaultAccessCodeAsync(holder.Email!, code, $"{owner.FirstName} {owner.LastName}", ct);
+
+        await sharedVaultAccessChallengeCache.SetAsync(
+            challengeToken,
+            challenge with { Counter = share.VerificationCounter, Attempts = 0, SentAt = now },
+            _vaultShareCodesOptions.AccessCodeExpiration,
+            ct);
 
         return ServiceResult.Success();
     }

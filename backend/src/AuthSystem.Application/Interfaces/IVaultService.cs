@@ -24,4 +24,8 @@ public interface IVaultService
     Task<ServiceResult<IReadOnlyList<VaultItemDto>>> GetSharedItemsAsync(Guid holderUserId, Guid vaultOwnerUserId, CancellationToken ct);
     Task<ServiceResult> VerifyShareAsync(Guid holderUserId, Guid shareId, string code, CancellationToken ct);
     Task<ServiceResult> ResendShareCodeAsync(Guid holderUserId, Guid shareId, CancellationToken ct);
+
+    Task<ServiceResult<SharedVaultAccessChallengeDto>> RequestSharedVaultAccessAsync(Guid holderUserId, Guid ownerUserId, CancellationToken ct);
+    Task<ServiceResult> VerifySharedVaultAccessAsync(Guid holderUserId, string challengeToken, string code, CancellationToken ct);
+    Task<ServiceResult> ResendSharedVaultAccessCodeAsync(Guid holderUserId, string challengeToken, CancellationToken ct);
 }

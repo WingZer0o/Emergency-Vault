@@ -79,6 +79,20 @@ public class EmailJobs
         await SendEmailAsync(body);
     }
 
+    public async Task SendSharedVaultAccessCodeAsync(string toEmail, string code, string ownerDisplayName)
+    {
+        EmailRequestBody body = new EmailRequestBody()
+        {
+            From = "support@mtmulch.com",
+            To = new List<string> { toEmail },
+            Subject = $"Your code to view {ownerDisplayName}'s shared vault",
+            Html = $"<p>Enter this code in the app to view the vault {ownerDisplayName} shared with you: <strong>{code}</strong>.</p>" +
+                   "<p>It expires in 10 minutes.</p>" +
+                   "<p>If you weren't trying to open this vault, you can ignore this email.</p>"
+        };
+        await SendEmailAsync(body);
+    }
+
     private async Task<bool> SendEmailAsync(EmailRequestBody body)
     {
         HttpClientSingleton httpClient = HttpClientSingleton.Instance;

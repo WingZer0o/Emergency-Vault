@@ -80,6 +80,8 @@ public static class DependencyInjection
 
         services.AddSingleton<IHotpService, HotpService>();
         services.AddSingleton<ITwoFactorChallengeCache, RedisTwoFactorChallengeCache>();
+        services.AddSingleton<ISharedVaultAccessChallengeCache, RedisSharedVaultAccessChallengeCache>();
+        services.AddSingleton<ISharedVaultAccessGrantCache, RedisSharedVaultAccessGrantCache>();
 
         return services;
     }

@@ -6,6 +6,8 @@ import { environment } from '../../../environments/environment';
 import {
   CreateVaultItemRequest,
   CreateVaultShareRequest,
+  ResendSharedVaultAccessRequest,
+  SharedVaultAccessChallengeDto,
   UpdateVaultItemRequest,
   VaultItemDto,
   VaultRecoverRequest,
@@ -16,6 +18,7 @@ import {
   VaultStatusDto,
   VaultUnlockBundleDto,
   VaultUserLookupDto,
+  VerifySharedVaultAccessRequest,
   VerifyVaultShareRequest,
 } from '../models/vault.models';
 
@@ -100,5 +103,17 @@ export class VaultService {
 
   resendShareCode(id: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/shares/${id}/resend-code`, {});
+  }
+
+  requestSharedVaultAccess(ownerUserId: string): Observable<SharedVaultAccessChallengeDto> {
+    return this.http.post<SharedVaultAccessChallengeDto>(`${this.baseUrl}/shared-with-me/${ownerUserId}/access-challenge`, {});
+  }
+
+  verifySharedVaultAccess(request: VerifySharedVaultAccessRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/shared-with-me/access/verify`, request);
+  }
+
+  resendSharedVaultAccessCode(request: ResendSharedVaultAccessRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/shared-with-me/access/resend`, request);
   }
 }

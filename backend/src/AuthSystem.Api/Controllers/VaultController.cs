@@ -160,4 +160,28 @@ public class VaultController(IVaultService vaultService) : ControllerBase
         var result = await vaultService.GetSharedItemsAsync(User.GetUserId(), ownerUserId, ct);
         return result.Succeeded ? Ok(result.Data) : StatusCode(StatusCodes.Status403Forbidden, new { errors = result.Errors });
     }
+
+    [HttpPost("shared-with-me/{ownerUserId:guid}/access-challenge")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> RequestSharedVaultAccess(Guid ownerUserId, CancellationToken ct)
+    {
+        var result = await vaultService.RequestSharedVaultAccessAsync(User.GetUserId(), ownerUserId, ct);
+        return result.Succeeded ? Ok(result.Data) : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("shared-with-me/access/verify")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> VerifySharedVaultAccess(VerifySharedVaultAccessRequest request, CancellationToken ct)
+    {
+        var result = await vaultService.VerifySharedVaultAccessAsync(User.GetUserId(), request.ChallengeToken, request.Code, ct);
+        return result.Succeeded ? Ok(new { message = "Access verified." }) : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("shared-with-me/access/resend")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> ResendSharedVaultAccessCode(ResendSharedVaultAccessRequest request, CancellationToken ct)
+    {
+        var result = await vaultService.ResendSharedVaultAccessCodeAsync(User.GetUserId(), request.ChallengeToken, ct);
+        return result.Succeeded ? Ok(new { message = "Code resent." }) : BadRequest(new { errors = result.Errors });
+    }
 }

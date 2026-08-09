@@ -98,6 +98,20 @@ export interface VerifyVaultShareRequest {
   code: string;
 }
 
+export interface SharedVaultAccessChallengeDto {
+  requiresCode: boolean;
+  challengeToken: string | null;
+}
+
+export interface VerifySharedVaultAccessRequest {
+  challengeToken: string;
+  code: string;
+}
+
+export interface ResendSharedVaultAccessRequest {
+  challengeToken: string;
+}
+
 /** A single labeled field within a vault item (e.g. { name: 'username', value: 'mike' }). */
 export interface VaultItemField {
   name: string;

@@ -33,7 +33,12 @@ public class VaultKeyShare
     /// </summary>
     public DateTimeOffset? VerifiedAt { get; set; }
 
-    /// <summary>base64 20-byte HOTP secret for this share's verification code. Null once verified - never needed again.</summary>
+    /// <summary>
+    /// base64 20-byte HOTP secret for this share's verification code. Kept (not nulled) after the
+    /// initial accept - it's reused to generate the per-session access codes required every time
+    /// the holder opens this shared vault. Null for shares created before that reuse existed;
+    /// those get a fresh secret lazily generated on first post-acceptance access request.
+    /// </summary>
     public string? VerificationSecret { get; set; }
 
     /// <summary>HOTP counter, bumped every time a code is issued or resent. Never reused once a code has gone out.</summary>
