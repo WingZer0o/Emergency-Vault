@@ -1,5 +1,6 @@
 import {
   decryptItemPayload,
+  deriveHybridWrapKey,
   deriveMasterKey,
   encryptItemPayload,
   exportPublicKeySpki,
@@ -10,8 +11,10 @@ import {
   importPublicKeySpki,
   importRecoveryKey,
   unwrapPrivateKey,
+  unwrapRawBytes,
   unwrapUvk,
   wrapPrivateKey,
+  wrapRawBytes,
   wrapUvkForPublicKey,
 } from './webcrypto.util';
 
@@ -93,5 +96,52 @@ describe('webcrypto.util', () => {
     const { privateKey } = await generateVaultKeypair();
     const wrapped = await wrapPrivateKey(privateKey, key);
     await expect(unwrapPrivateKey(wrapped, reimported, false)).resolves.toBeDefined();
+  });
+
+  it('round-trips raw bytes through wrapRawBytes/unwrapRawBytes', async () => {
+    const masterKey = await deriveMasterKey('hunter2', generateSaltBase64(), 200_000);
+    const bytes = crypto.getRandomValues(new Uint8Array(2400)); // ML-KEM-768 secret key size
+
+    const wrapped = await wrapRawBytes(bytes, masterKey);
+    const unwrapped = await unwrapRawBytes(wrapped, masterKey);
+
+    expect(unwrapped).toEqual(bytes);
+  });
+
+  it('throws when unwrapping raw bytes with the wrong wrapping key', async () => {
+    const correctKey = await deriveMasterKey('right-password', generateSaltBase64(), 200_000);
+    const wrongKey = await deriveMasterKey('wrong-password', generateSaltBase64(), 200_000);
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+
+    const wrapped = await wrapRawBytes(bytes, correctKey);
+
+    await expect(unwrapRawBytes(wrapped, wrongKey)).rejects.toThrow();
+  });
+
+  it('deriveHybridWrapKey derives equal, usable keys from equal inputs', async () => {
+    const ikm = crypto.getRandomValues(new Uint8Array(64));
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const info = new TextEncoder().encode('test-context');
+
+    const keyA = await deriveHybridWrapKey(ikm, salt, info);
+    const keyB = await deriveHybridWrapKey(ikm, salt, info);
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plaintext = new TextEncoder().encode('hello');
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, keyA, plaintext);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, keyB, ciphertext);
+    expect(new TextDecoder().decode(decrypted)).toBe('hello');
+  });
+
+  it('deriveHybridWrapKey derives different keys for different info (context binding)', async () => {
+    const ikm = crypto.getRandomValues(new Uint8Array(64));
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+
+    const keyA = await deriveHybridWrapKey(ikm, salt, new TextEncoder().encode('context-a'));
+    const keyB = await deriveHybridWrapKey(ikm, salt, new TextEncoder().encode('context-b'));
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, keyA, new TextEncoder().encode('hello'));
+    await expect(crypto.subtle.decrypt({ name: 'AES-GCM', iv }, keyB, ciphertext)).rejects.toThrow();
   });
 });

@@ -60,6 +60,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(v => v.KdfSalt).IsRequired();
             e.Property(v => v.PrivateKeyWrappedByMasterKey).IsRequired();
             e.Property(v => v.PrivateKeyWrappedByRecoveryKey).IsRequired();
+            e.Property(v => v.KeySchemeVersion).HasDefaultValue(1);
             e.HasOne(v => v.User)
                 .WithMany()
                 .HasForeignKey(v => v.UserId)

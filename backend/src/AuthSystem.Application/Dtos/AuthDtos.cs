@@ -29,7 +29,8 @@ public record ResetPasswordRequest(
 public record VaultRewrapDto(
     [Required] string NewKdfSalt,
     [Required, Range(200_000, 5_000_000)] int NewKdfIterations,
-    [Required] string NewPrivateKeyWrappedByMasterKey);
+    [Required] string NewPrivateKeyWrappedByMasterKey,
+    string? NewMlKemSecretKeyWrappedByMasterKey);
 
 public record UserProfileDto(Guid Id, string Email, string FirstName, string LastName, IReadOnlyList<string> Roles);
 

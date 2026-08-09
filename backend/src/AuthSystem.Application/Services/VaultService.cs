@@ -36,6 +36,10 @@ public class VaultService(
             KdfIterations = request.KdfIterations,
             PrivateKeyWrappedByMasterKey = request.PrivateKeyWrappedByMasterKey,
             PrivateKeyWrappedByRecoveryKey = request.PrivateKeyWrappedByRecoveryKey,
+            KeySchemeVersion = 2,
+            MlKemPublicKey = request.MlKemPublicKey,
+            MlKemSecretKeyWrappedByMasterKey = request.MlKemSecretKeyWrappedByMasterKey,
+            MlKemSecretKeyWrappedByRecoveryKey = request.MlKemSecretKeyWrappedByRecoveryKey,
         };
         await vaultRepository.AddProfileAsync(profile, ct);
 
@@ -85,7 +89,10 @@ public class VaultService(
             profile.KdfIterations,
             profile.PrivateKeyWrappedByMasterKey,
             profile.PrivateKeyWrappedByRecoveryKey,
-            selfShare.WrappedUvk));
+            selfShare.WrappedUvk,
+            profile.MlKemPublicKey,
+            profile.MlKemSecretKeyWrappedByMasterKey,
+            profile.MlKemSecretKeyWrappedByRecoveryKey));
     }
 
     public async Task<ServiceResult> RewrapMasterKeyAsync(Guid userId, VaultRewrapDto request, CancellationToken ct)
@@ -99,6 +106,15 @@ public class VaultService(
         profile.KdfSalt = request.NewKdfSalt;
         profile.KdfIterations = request.NewKdfIterations;
         profile.PrivateKeyWrappedByMasterKey = request.NewPrivateKeyWrappedByMasterKey;
+
+        // A legacy (KeySchemeVersion 1) account's reset/recover flow never sends this - only
+        // overwrite when a value is actually provided, so we never null out a hybrid account's
+        // stored ML-KEM secret key wrapping.
+        if (request.NewMlKemSecretKeyWrappedByMasterKey is not null)
+        {
+            profile.MlKemSecretKeyWrappedByMasterKey = request.NewMlKemSecretKeyWrappedByMasterKey;
+        }
+
         profile.UpdatedAt = DateTimeOffset.UtcNow;
 
         await vaultRepository.SaveChangesAsync(ct);
@@ -127,7 +143,8 @@ public class VaultService(
             return ServiceResult<VaultResetRecoveryBundleDto>.Failure("No vault set up for this account.");
         }
 
-        return ServiceResult<VaultResetRecoveryBundleDto>.Success(new VaultResetRecoveryBundleDto(profile.PrivateKeyWrappedByRecoveryKey));
+        return ServiceResult<VaultResetRecoveryBundleDto>.Success(
+            new VaultResetRecoveryBundleDto(profile.PrivateKeyWrappedByRecoveryKey, profile.MlKemSecretKeyWrappedByRecoveryKey));
     }
 
     public async Task<ServiceResult<VaultItemDto>> CreateItemAsync(Guid ownerUserId, CreateVaultItemRequest request, CancellationToken ct)
@@ -203,7 +220,8 @@ public class VaultService(
             return ServiceResult<VaultUserLookupDto>.Failure("No user found with that email, or they haven't set up their vault yet.");
         }
 
-        return ServiceResult<VaultUserLookupDto>.Success(new VaultUserLookupDto(user.Id, user.FirstName, user.LastName, profile.PublicKey));
+        return ServiceResult<VaultUserLookupDto>.Success(
+            new VaultUserLookupDto(user.Id, user.FirstName, user.LastName, profile.PublicKey, profile.MlKemPublicKey));
     }
 
     public async Task<ServiceResult<VaultShareDto>> CreateShareAsync(Guid ownerUserId, CreateVaultShareRequest request, CancellationToken ct)

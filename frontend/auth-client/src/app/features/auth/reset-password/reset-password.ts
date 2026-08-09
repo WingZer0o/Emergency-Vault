@@ -13,7 +13,9 @@ import {
   generateSaltBase64,
   importRecoveryKey,
   unwrapPrivateKey,
+  unwrapRawBytes,
   wrapPrivateKey,
+  wrapRawBytes,
 } from '../../../core/crypto/webcrypto.util';
 import { VaultRecoverRequest } from '../../../core/models/vault.models';
 import { AuthService } from '../../../core/services/auth.service';
@@ -51,6 +53,8 @@ export class ResetPassword implements OnInit {
 
   /** Set only if this account has a vault - fetched via the anonymous reset-recovery-bundle endpoint. */
   private privateKeyWrappedByRecoveryKey: string | null = null;
+  /** Set only if this account's vault has been upgraded to the hybrid RSA + ML-KEM scheme. */
+  private mlKemSecretKeyWrappedByRecoveryKey: string | null = null;
 
   readonly linkInvalid = !this.userId || !this.token;
   readonly loading = signal(false);
@@ -78,6 +82,7 @@ export class ResetPassword implements OnInit {
     this.vaultService.getResetRecoveryBundle(this.userId, this.token).subscribe({
       next: (bundle) => {
         this.privateKeyWrappedByRecoveryKey = bundle.privateKeyWrappedByRecoveryKey;
+        this.mlKemSecretKeyWrappedByRecoveryKey = bundle.mlKemSecretKeyWrappedByRecoveryKey;
         this.hasVaultToRecover.set(true);
       },
       error: () => {},
@@ -114,10 +119,11 @@ export class ResetPassword implements OnInit {
   }
 
   /**
-   * Unwraps the vault's private key using the recovery key (never the old password, which this
-   * flow never has), then re-wraps it under a Master Key derived from the new password - so the
-   * vault stays reachable via the normal unlock screen after this reset. Returns undefined (no
-   * rewrap attached) when there's no vault to recover or the user left the field blank.
+   * Unwraps the vault's private key (and ML-KEM secret key, if this vault has one) using the
+   * recovery key (never the old password, which this flow never has), then re-wraps them under a
+   * Master Key derived from the new password - so the vault stays reachable via the normal unlock
+   * screen after this reset. Returns undefined (no rewrap attached) when there's no vault to
+   * recover or the user left the field blank.
    */
   private async buildVaultRewrap(newPassword: string, recoveryKeyDisplay: string): Promise<VaultRecoverRequest | undefined> {
     if (!this.privateKeyWrappedByRecoveryKey || !recoveryKeyDisplay) {
@@ -126,11 +132,22 @@ export class ResetPassword implements OnInit {
 
     const recoveryKey = await importRecoveryKey(recoveryKeyDisplay);
     const privateKey = await unwrapPrivateKey(this.privateKeyWrappedByRecoveryKey, recoveryKey, true);
+    const mlKemSecretKey = this.mlKemSecretKeyWrappedByRecoveryKey
+      ? await unwrapRawBytes(this.mlKemSecretKeyWrappedByRecoveryKey, recoveryKey)
+      : null;
 
     const newKdfSalt = generateSaltBase64();
     const newMasterKey = await deriveMasterKey(newPassword, newKdfSalt, DEFAULT_KDF_ITERATIONS);
     const newPrivateKeyWrappedByMasterKey = await wrapPrivateKey(privateKey, newMasterKey);
+    const newMlKemSecretKeyWrappedByMasterKey = mlKemSecretKey
+      ? await wrapRawBytes(mlKemSecretKey, newMasterKey)
+      : undefined;
 
-    return { newKdfSalt, newKdfIterations: DEFAULT_KDF_ITERATIONS, newPrivateKeyWrappedByMasterKey };
+    return {
+      newKdfSalt,
+      newKdfIterations: DEFAULT_KDF_ITERATIONS,
+      newPrivateKeyWrappedByMasterKey,
+      newMlKemSecretKeyWrappedByMasterKey,
+    };
   }
 }

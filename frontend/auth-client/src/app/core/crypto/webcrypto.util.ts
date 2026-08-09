@@ -4,8 +4,8 @@
 // wrapped, so an unwrapped key can stay non-extractable in memory rather than round-tripping
 // through raw bytes in JS.
 
-const AES_ALGO = 'AES-GCM';
-const RSA_ALGO = { name: 'RSA-OAEP', hash: 'SHA-256' } as const;
+export const AES_ALGO = 'AES-GCM';
+export const RSA_ALGO = { name: 'RSA-OAEP', hash: 'SHA-256' } as const;
 const IV_LENGTH_BYTES = 12;
 const SALT_LENGTH_BYTES = 16;
 const RECOVERY_KEY_LENGTH_BYTES = 32;
@@ -14,7 +14,7 @@ const RSA_MODULUS_LENGTH = 3072;
 /** PBKDF2-SHA256 iterations for deriving a Master Key from a password, per current OWASP guidance. */
 export const DEFAULT_KDF_ITERATIONS = 600_000;
 
-function toBase64(bytes: ArrayBuffer | Uint8Array<ArrayBuffer>): string {
+export function toBase64(bytes: ArrayBuffer | Uint8Array<ArrayBuffer>): string {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let binary = '';
   for (const byte of arr) {
@@ -23,7 +23,7 @@ function toBase64(bytes: ArrayBuffer | Uint8Array<ArrayBuffer>): string {
   return btoa(binary);
 }
 
-function fromBase64(base64: string): Uint8Array<ArrayBuffer> {
+export function fromBase64(base64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -64,16 +64,18 @@ export async function deriveMasterKey(password: string, saltB64: string, iterati
     keyMaterial,
     { name: AES_ALGO, length: 256 },
     false,
-    ['wrapKey', 'unwrapKey'],
+    ['wrapKey', 'unwrapKey', 'encrypt', 'decrypt'],
   );
 }
 
-/** Generates the user's RSA-OAEP keypair. Private key is extractable this one time only, so it can be wrapped for storage. */
+/** Generates the user's RSA-OAEP keypair. Private key is extractable this one time only, so it can be wrapped for storage.
+ * Carries both wrapKey/unwrapKey (for the legacy pure-RSA UVK wrap) and encrypt/decrypt (for the
+ * RSA-side secret in the hybrid combiner, see hybrid-kem.util.ts) usages. */
 export async function generateVaultKeypair(): Promise<CryptoKeyPair> {
   return (await crypto.subtle.generateKey(
     { ...RSA_ALGO, modulusLength: RSA_MODULUS_LENGTH, publicExponent: new Uint8Array([1, 0, 1]) },
     true,
-    ['wrapKey', 'unwrapKey'],
+    ['wrapKey', 'unwrapKey', 'encrypt', 'decrypt'],
   )) as CryptoKeyPair;
 }
 
@@ -88,11 +90,14 @@ export async function wrapPrivateKey(privateKey: CryptoKey, wrappingKey: CryptoK
   return toBase64(concatBytes(iv, new Uint8Array(wrapped)));
 }
 
-/** A wrong wrappingKey (e.g. bad password) throws here via a GCM auth-tag mismatch - this doubles as the password check. */
+/** A wrong wrappingKey (e.g. bad password) throws here via a GCM auth-tag mismatch - this doubles as the password check.
+ * Grants both unwrapKey (legacy pure-RSA UVK unwrap) and decrypt (RSA-side secret in the hybrid
+ * combiner, see hybrid-kem.util.ts) usages, mirroring generateVaultKeypair. */
 export async function unwrapPrivateKey(blobB64: string, wrappingKey: CryptoKey, extractable: boolean): Promise<CryptoKey> {
   const { iv, ciphertext } = splitIvAndCiphertext(blobB64);
   return crypto.subtle.unwrapKey('pkcs8', ciphertext, wrappingKey, { name: AES_ALGO, iv }, RSA_ALGO, extractable, [
     'unwrapKey',
+    'decrypt',
   ]);
 }
 
@@ -114,6 +119,40 @@ export async function unwrapUvk(blobB64: string, privateKey: CryptoKey, extracta
   );
 }
 
+/** Generic AES-GCM encrypt of arbitrary raw bytes (e.g. an ML-KEM secret key, which has no native
+ * CryptoKey/wrapKey format), under the same wrapping keys (Master Key / Recovery Key) that
+ * wrapPrivateKey uses for the RSA private key. Same base64(IV || ciphertext) shape. */
+export async function wrapRawBytes(bytes: Uint8Array<ArrayBuffer>, wrappingKey: CryptoKey): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
+  const ciphertext = await crypto.subtle.encrypt({ name: AES_ALGO, iv }, wrappingKey, bytes);
+  return toBase64(concatBytes(iv, new Uint8Array(ciphertext)));
+}
+
+/** A wrong wrappingKey throws here via a GCM auth-tag mismatch, same as unwrapPrivateKey. */
+export async function unwrapRawBytes(blobB64: string, wrappingKey: CryptoKey): Promise<Uint8Array<ArrayBuffer>> {
+  const { iv, ciphertext } = splitIvAndCiphertext(blobB64);
+  const plaintext = await crypto.subtle.decrypt({ name: AES_ALGO, iv }, wrappingKey, ciphertext);
+  return new Uint8Array(plaintext);
+}
+
+/** Derives a single-use AES-256-GCM key from hybrid-combiner input keying material via native
+ * HKDF-SHA256. `info` should bind the derived key to the exact envelope it's for (see
+ * hybrid-kem.util.ts) so a derived key can never be confused across envelopes. */
+export async function deriveHybridWrapKey(
+  ikm: Uint8Array<ArrayBuffer>,
+  salt: Uint8Array<ArrayBuffer>,
+  info: Uint8Array<ArrayBuffer>,
+): Promise<CryptoKey> {
+  const keyMaterial = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt, info },
+    keyMaterial,
+    { name: AES_ALGO, length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
 export async function encryptItemPayload(uvk: CryptoKey, payload: unknown): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
@@ -131,8 +170,10 @@ export async function exportPublicKeySpki(publicKey: CryptoKey): Promise<string>
   return toBase64(await crypto.subtle.exportKey('spki', publicKey));
 }
 
+/** Grants both wrapKey (legacy pure-RSA UVK wrap) and encrypt (RSA-side secret in the hybrid
+ * combiner, see hybrid-kem.util.ts) usages, mirroring generateVaultKeypair. */
 export async function importPublicKeySpki(base64: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey('spki', fromBase64(base64), RSA_ALGO, false, ['wrapKey']);
+  return crypto.subtle.importKey('spki', fromBase64(base64), RSA_ALGO, false, ['wrapKey', 'encrypt']);
 }
 
 export interface GeneratedRecoveryKey {
@@ -143,7 +184,12 @@ export interface GeneratedRecoveryKey {
 
 export async function generateRecoveryKey(): Promise<GeneratedRecoveryKey> {
   const raw = crypto.getRandomValues(new Uint8Array(RECOVERY_KEY_LENGTH_BYTES));
-  const key = await crypto.subtle.importKey('raw', raw, AES_ALGO, false, ['wrapKey', 'unwrapKey']);
+  const key = await crypto.subtle.importKey('raw', raw, AES_ALGO, false, [
+    'wrapKey',
+    'unwrapKey',
+    'encrypt',
+    'decrypt',
+  ]);
   return { key, displayValue: formatRecoveryKeyForDisplay(raw) };
 }
 
@@ -152,6 +198,8 @@ export async function importRecoveryKey(displayValue: string): Promise<CryptoKey
   return crypto.subtle.importKey('raw', parseRecoveryKeyFromDisplay(displayValue), AES_ALGO, false, [
     'wrapKey',
     'unwrapKey',
+    'encrypt',
+    'decrypt',
   ]);
 }
 

@@ -304,6 +304,20 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("KeySchemeVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<string>("MlKemPublicKey")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MlKemSecretKeyWrappedByMasterKey")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MlKemSecretKeyWrappedByRecoveryKey")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PrivateKeyWrappedByMasterKey")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

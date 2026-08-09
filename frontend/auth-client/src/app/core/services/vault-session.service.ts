@@ -10,11 +10,14 @@ import {
   generateUvk,
   generateVaultKeypair,
   importRecoveryKey,
+  toBase64,
   unwrapPrivateKey,
-  unwrapUvk,
+  unwrapRawBytes,
   wrapPrivateKey,
-  wrapUvkForPublicKey,
+  wrapRawBytes,
 } from '../crypto/webcrypto.util';
+import { unwrapUvkVersioned, wrapUvkHybrid } from '../crypto/hybrid-kem.util';
+import { generateMlKemKeypair } from '../crypto/ml-kem.util';
 import { clearVaultKeys, loadVaultKeys, saveVaultKeys } from '../crypto/vault-key-store';
 import { VaultService } from './vault.service';
 
@@ -27,7 +30,8 @@ const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart'] as cons
  * Holds the vault's unwrapped key material for the current session. Persisted to IndexedDB (see
  * core/crypto/vault-key-store.ts) so it survives a page refresh - IndexedDB preserves a CryptoKey's
  * non-extractable flag via structured clone, so this never exposes raw key bytes to JS, unlike
- * storing anything in localStorage/sessionStorage would. Cleared on lock() (explicit logout or
+ * storing anything in localStorage/sessionStorage would. (The ML-KEM secret key is an exception to
+ * that non-extractable guarantee - see vault-key-store.ts.) Cleared on lock() (explicit logout or
  * idle timeout) and on a stale/failed restore attempt.
  */
 @Injectable({ providedIn: 'root' })
@@ -36,6 +40,8 @@ export class VaultSessionService {
 
   private readonly privateKeySig = signal<CryptoKey | null>(null);
   private readonly uvkSig = signal<CryptoKey | null>(null);
+  /** Null for a vault that hasn't been upgraded to the hybrid PQC scheme (legacy RSA-only). */
+  private readonly mlKemSecretKeySig = signal<Uint8Array<ArrayBuffer> | null>(null);
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly onActivity = () => this.resetIdleTimer();
 
@@ -67,6 +73,7 @@ export class VaultSessionService {
       if (stored) {
         this.privateKeySig.set(stored.privateKey);
         this.uvkSig.set(stored.uvk);
+        this.mlKemSecretKeySig.set(stored.mlKemSecretKey);
       }
     } catch {
       // No persisted session, or IndexedDB unavailable (e.g. strict private-browsing mode) - the
@@ -74,21 +81,31 @@ export class VaultSessionService {
     }
   }
 
-  /** Sets up a brand-new vault for the current user. Returns the recovery key display string - show it once, it is never stored anywhere. */
+  /** Sets up a brand-new vault for the current user. New vaults always use the hybrid RSA-OAEP +
+   * ML-KEM scheme. Returns the recovery key display string - show it once, it is never stored anywhere. */
   async setupVault(password: string): Promise<string> {
     const { publicKey, privateKey } = await generateVaultKeypair();
+    const mlKem = generateMlKemKeypair();
     const uvk = await generateUvk();
     const kdfSalt = generateSaltBase64();
     const masterKey = await deriveMasterKey(password, kdfSalt, DEFAULT_KDF_ITERATIONS);
     const recovery = await generateRecoveryKey();
 
-    const [privateKeyWrappedByMasterKey, privateKeyWrappedByRecoveryKey, selfWrappedUvk, publicKeySpki] =
-      await Promise.all([
-        wrapPrivateKey(privateKey, masterKey),
-        wrapPrivateKey(privateKey, recovery.key),
-        wrapUvkForPublicKey(uvk, publicKey),
-        exportPublicKeySpki(publicKey),
-      ]);
+    const [
+      privateKeyWrappedByMasterKey,
+      privateKeyWrappedByRecoveryKey,
+      mlKemSecretKeyWrappedByMasterKey,
+      mlKemSecretKeyWrappedByRecoveryKey,
+      selfWrappedUvk,
+      publicKeySpki,
+    ] = await Promise.all([
+      wrapPrivateKey(privateKey, masterKey),
+      wrapPrivateKey(privateKey, recovery.key),
+      wrapRawBytes(mlKem.secretKey, masterKey),
+      wrapRawBytes(mlKem.secretKey, recovery.key),
+      wrapUvkHybrid(uvk, publicKey, mlKem.publicKey),
+      exportPublicKeySpki(publicKey),
+    ]);
 
     await firstValueFrom(
       this.vaultService.setup({
@@ -98,10 +115,13 @@ export class VaultSessionService {
         privateKeyWrappedByMasterKey,
         privateKeyWrappedByRecoveryKey,
         selfWrappedUvk,
+        mlKemPublicKey: toBase64(mlKem.publicKey),
+        mlKemSecretKeyWrappedByMasterKey,
+        mlKemSecretKeyWrappedByRecoveryKey,
       }),
     );
 
-    await this.persistSession(privateKey, uvk);
+    await this.persistSession(privateKey, uvk, mlKem.secretKey);
 
     return recovery.displayValue;
   }
@@ -110,40 +130,58 @@ export class VaultSessionService {
   async unlockWithPassword(password: string): Promise<void> {
     const bundle = await firstValueFrom(this.vaultService.getUnlockBundle());
     const masterKey = await deriveMasterKey(password, bundle.kdfSalt, bundle.kdfIterations);
-    await this.unlockFromBundle(masterKey, bundle.privateKeyWrappedByMasterKey, bundle.wrappedUvkSelf);
+    await this.unlockFromBundle(
+      masterKey,
+      bundle.privateKeyWrappedByMasterKey,
+      bundle.mlKemSecretKeyWrappedByMasterKey,
+      bundle.wrappedUvkSelf,
+    );
   }
 
   /** Unlocks the vault with the one-time recovery key instead of the password. */
   async unlockWithRecoveryKey(recoveryKeyDisplay: string): Promise<void> {
     const bundle = await firstValueFrom(this.vaultService.getUnlockBundle());
     const recoveryKey = await importRecoveryKey(recoveryKeyDisplay);
-    await this.unlockFromBundle(recoveryKey, bundle.privateKeyWrappedByRecoveryKey, bundle.wrappedUvkSelf);
+    await this.unlockFromBundle(
+      recoveryKey,
+      bundle.privateKeyWrappedByRecoveryKey,
+      bundle.mlKemSecretKeyWrappedByRecoveryKey,
+      bundle.wrappedUvkSelf,
+    );
   }
 
   /**
    * Recovers vault access after a password reset that skipped the vault rewrap step: unwraps the
-   * private key with the recovery key, re-wraps it under a Master Key derived from the (new)
-   * current password, and persists the new wrapping server-side via /vault/recover.
+   * private key (and ML-KEM secret key, if this vault has one) with the recovery key, re-wraps
+   * them under a Master Key derived from the (new) current password, and persists the new
+   * wrapping server-side via /vault/recover.
    */
   async recoverWithRecoveryKey(recoveryKeyDisplay: string, currentPassword: string): Promise<void> {
     const bundle = await firstValueFrom(this.vaultService.getUnlockBundle());
     const recoveryKey = await importRecoveryKey(recoveryKeyDisplay);
     const privateKey = await unwrapPrivateKey(bundle.privateKeyWrappedByRecoveryKey, recoveryKey, true);
+    const mlKemSecretKey = bundle.mlKemSecretKeyWrappedByRecoveryKey
+      ? await unwrapRawBytes(bundle.mlKemSecretKeyWrappedByRecoveryKey, recoveryKey)
+      : null;
 
     const newKdfSalt = generateSaltBase64();
     const newMasterKey = await deriveMasterKey(currentPassword, newKdfSalt, DEFAULT_KDF_ITERATIONS);
     const newPrivateKeyWrappedByMasterKey = await wrapPrivateKey(privateKey, newMasterKey);
+    const newMlKemSecretKeyWrappedByMasterKey = mlKemSecretKey
+      ? await wrapRawBytes(mlKemSecretKey, newMasterKey)
+      : undefined;
 
     await firstValueFrom(
       this.vaultService.recover({
         newKdfSalt,
         newKdfIterations: DEFAULT_KDF_ITERATIONS,
         newPrivateKeyWrappedByMasterKey,
+        newMlKemSecretKeyWrappedByMasterKey,
       }),
     );
 
-    const uvk = await unwrapUvk(bundle.wrappedUvkSelf, privateKey, true);
-    await this.persistSession(privateKey, uvk);
+    const uvk = await unwrapUvkVersioned(bundle.wrappedUvkSelf, privateKey, mlKemSecretKey, true);
+    await this.persistSession(privateKey, uvk, mlKemSecretKey);
   }
 
   /** Unwraps a UVK that was wrapped for this user as an emergency-access recipient, not their own vault. Non-extractable - a holder never needs to re-share someone else's vault. */
@@ -153,33 +191,44 @@ export class VaultSessionService {
       throw new Error('Vault is not unlocked.');
     }
 
-    return unwrapUvk(wrappedUvk, privateKey, false);
+    return unwrapUvkVersioned(wrappedUvk, privateKey, this.mlKemSecretKeySig(), false);
   }
 
   /** Locks the vault: clears in-memory key material and the persisted IndexedDB copy. Called on explicit logout and on idle timeout. */
   async lock(): Promise<void> {
+    this.mlKemSecretKeySig()?.fill(0);
     this.privateKeySig.set(null);
     this.uvkSig.set(null);
+    this.mlKemSecretKeySig.set(null);
     await clearVaultKeys().catch(() => {});
   }
 
   private async unlockFromBundle(
     wrappingKey: CryptoKey,
     wrappedPrivateKey: string,
+    wrappedMlKemSecretKey: string | null,
     wrappedUvkSelf: string,
   ): Promise<void> {
     const privateKey = await unwrapPrivateKey(wrappedPrivateKey, wrappingKey, false);
-    const uvk = await unwrapUvk(wrappedUvkSelf, privateKey, true);
+    const mlKemSecretKey = wrappedMlKemSecretKey
+      ? await unwrapRawBytes(wrappedMlKemSecretKey, wrappingKey)
+      : null;
+    const uvk = await unwrapUvkVersioned(wrappedUvkSelf, privateKey, mlKemSecretKey, true);
 
-    await this.persistSession(privateKey, uvk);
+    await this.persistSession(privateKey, uvk, mlKemSecretKey);
   }
 
-  private async persistSession(privateKey: CryptoKey, uvk: CryptoKey): Promise<void> {
+  private async persistSession(
+    privateKey: CryptoKey,
+    uvk: CryptoKey,
+    mlKemSecretKey: Uint8Array<ArrayBuffer> | null,
+  ): Promise<void> {
     this.privateKeySig.set(privateKey);
     this.uvkSig.set(uvk);
+    this.mlKemSecretKeySig.set(mlKemSecretKey);
 
     try {
-      await saveVaultKeys({ privateKey, uvk });
+      await saveVaultKeys({ privateKey, uvk, mlKemSecretKey });
     } catch {
       // Best-effort - the session still works for the current tab even if IndexedDB persistence
       // fails (e.g. strict private-browsing mode); it just won't survive a refresh.

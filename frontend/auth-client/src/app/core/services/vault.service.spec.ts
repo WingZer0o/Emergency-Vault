@@ -28,6 +28,9 @@ describe('VaultService', () => {
       privateKeyWrappedByMasterKey: 'a',
       privateKeyWrappedByRecoveryKey: 'b',
       selfWrappedUvk: 'c',
+      mlKemPublicKey: 'd',
+      mlKemSecretKeyWrappedByMasterKey: 'e',
+      mlKemSecretKeyWrappedByRecoveryKey: 'f',
     };
 
     service.setup(request).subscribe();

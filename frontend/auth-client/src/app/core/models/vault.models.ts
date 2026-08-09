@@ -9,6 +9,9 @@ export interface VaultSetupRequest {
   privateKeyWrappedByMasterKey: string;
   privateKeyWrappedByRecoveryKey: string;
   selfWrappedUvk: string;
+  mlKemPublicKey: string;
+  mlKemSecretKeyWrappedByMasterKey: string;
+  mlKemSecretKeyWrappedByRecoveryKey: string;
 }
 
 export interface VaultStatusDto {
@@ -21,16 +24,22 @@ export interface VaultUnlockBundleDto {
   privateKeyWrappedByMasterKey: string;
   privateKeyWrappedByRecoveryKey: string;
   wrappedUvkSelf: string;
+  /** Null for a vault that predates the hybrid RSA + ML-KEM scheme and hasn't been upgraded. */
+  mlKemPublicKey: string | null;
+  mlKemSecretKeyWrappedByMasterKey: string | null;
+  mlKemSecretKeyWrappedByRecoveryKey: string | null;
 }
 
 export interface VaultRecoverRequest {
   newKdfSalt: string;
   newKdfIterations: number;
   newPrivateKeyWrappedByMasterKey: string;
+  newMlKemSecretKeyWrappedByMasterKey?: string;
 }
 
 export interface VaultResetRecoveryBundleDto {
   privateKeyWrappedByRecoveryKey: string;
+  mlKemSecretKeyWrappedByRecoveryKey: string | null;
 }
 
 export interface CreateVaultItemRequest {
@@ -53,6 +62,8 @@ export interface VaultUserLookupDto {
   firstName: string;
   lastName: string;
   publicKey: string;
+  /** Null if this user's vault predates the hybrid RSA + ML-KEM scheme - sharing falls back to legacy RSA-only for them. */
+  mlKemPublicKey: string | null;
 }
 
 export interface CreateVaultShareRequest {

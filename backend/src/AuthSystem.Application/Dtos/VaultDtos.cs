@@ -9,7 +9,10 @@ public record VaultSetupRequest(
     [Required, Range(200_000, 5_000_000)] int KdfIterations,
     [Required] string PrivateKeyWrappedByMasterKey,
     [Required] string PrivateKeyWrappedByRecoveryKey,
-    [Required] string SelfWrappedUvk);
+    [Required] string SelfWrappedUvk,
+    [Required] string MlKemPublicKey,
+    [Required] string MlKemSecretKeyWrappedByMasterKey,
+    [Required] string MlKemSecretKeyWrappedByRecoveryKey);
 
 public record VaultStatusDto(bool HasVault);
 
@@ -18,14 +21,18 @@ public record VaultUnlockBundleDto(
     int KdfIterations,
     string PrivateKeyWrappedByMasterKey,
     string PrivateKeyWrappedByRecoveryKey,
-    string WrappedUvkSelf);
+    string WrappedUvkSelf,
+    string? MlKemPublicKey,
+    string? MlKemSecretKeyWrappedByMasterKey,
+    string? MlKemSecretKeyWrappedByRecoveryKey);
 
 public record VaultRecoverRequest(
     [Required] string NewKdfSalt,
     [Required, Range(200_000, 5_000_000)] int NewKdfIterations,
-    [Required] string NewPrivateKeyWrappedByMasterKey);
+    [Required] string NewPrivateKeyWrappedByMasterKey,
+    string? NewMlKemSecretKeyWrappedByMasterKey);
 
-public record VaultResetRecoveryBundleDto(string PrivateKeyWrappedByRecoveryKey);
+public record VaultResetRecoveryBundleDto(string PrivateKeyWrappedByRecoveryKey, string? MlKemSecretKeyWrappedByRecoveryKey);
 
 public record CreateVaultItemRequest([Required] string CiphertextBlob);
 
@@ -33,7 +40,7 @@ public record UpdateVaultItemRequest([Required] string CiphertextBlob);
 
 public record VaultItemDto(Guid Id, string CiphertextBlob, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
-public record VaultUserLookupDto(Guid UserId, string FirstName, string LastName, string PublicKey);
+public record VaultUserLookupDto(Guid UserId, string FirstName, string LastName, string PublicKey, string? MlKemPublicKey);
 
 public record CreateVaultShareRequest(
     [Required, EmailAddress] string HolderEmail,

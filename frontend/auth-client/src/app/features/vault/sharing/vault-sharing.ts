@@ -9,7 +9,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { importPublicKeySpki, wrapUvkForPublicKey } from '../../../core/crypto/webcrypto.util';
+import { importPublicKeySpki } from '../../../core/crypto/webcrypto.util';
+import { wrapUvkForRecipient } from '../../../core/crypto/hybrid-kem.util';
 import { VaultShareDto, VaultShareStatus } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
@@ -65,7 +66,7 @@ export class VaultSharing implements OnInit {
     this.vaultService.lookupUser(email).subscribe({
       next: (lookup) => {
         importPublicKeySpki(lookup.publicKey)
-          .then((publicKey) => wrapUvkForPublicKey(this.vaultSession.uvk, publicKey))
+          .then((publicKey) => wrapUvkForRecipient(this.vaultSession.uvk, publicKey, lookup.mlKemPublicKey))
           .then((wrappedUvk) => {
             this.vaultService.createShare({ holderEmail: email, wrappedUvk }).subscribe({
               next: (share) => {

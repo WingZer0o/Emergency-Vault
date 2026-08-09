@@ -4,6 +4,11 @@
 // "non-extractable" flag - so even with this persistence, the raw key bytes are never exposed to
 // JS, in storage or otherwise. Only crypto.subtle operations using the key remain possible.
 // Cleared explicitly on lock()/logout - see VaultSessionService.
+//
+// mlKemSecretKey doesn't get that same protection: ML-KEM has no native CryptoKey type (see
+// hybrid-kem.util.ts), so it's stored as plain Uint8Array bytes, readable by any JS running in
+// this origin - an inherent limitation of a JS-implemented PQC algorithm, not a gap introduced
+// here. Structured clone supports Uint8Array natively, same as CryptoKey.
 
 const DB_NAME = 'vault-keys';
 const STORE_NAME = 'session';
@@ -13,6 +18,7 @@ const DB_VERSION = 1;
 export interface StoredVaultKeys {
   privateKey: CryptoKey;
   uvk: CryptoKey;
+  mlKemSecretKey: Uint8Array<ArrayBuffer> | null;
 }
 
 function openDb(): Promise<IDBDatabase> {

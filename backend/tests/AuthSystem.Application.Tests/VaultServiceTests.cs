@@ -52,7 +52,9 @@ public class VaultServiceTests
 
     private static async Task SetUpVaultAsync(VaultService service, Guid userId, string publicKey = "pub")
     {
-        var request = new VaultSetupRequest(publicKey, "salt", 600_000, "wrappedPriv", "wrappedPrivRecovery", "selfWrappedUvk");
+        var request = new VaultSetupRequest(
+            publicKey, "salt", 600_000, "wrappedPriv", "wrappedPrivRecovery", "selfWrappedUvk",
+            "mlKemPub", "mlKemSecretMaster", "mlKemSecretRecovery");
         var result = await service.SetupAsync(userId, request, CancellationToken.None);
         Assert.True(result.Succeeded);
     }
@@ -64,7 +66,8 @@ public class VaultServiceTests
         var userId = Guid.NewGuid();
         await SetUpVaultAsync(service, userId);
 
-        var second = await service.SetupAsync(userId, new VaultSetupRequest("pub2", "salt2", 600_000, "a", "b", "c"), CancellationToken.None);
+        var second = await service.SetupAsync(
+            userId, new VaultSetupRequest("pub2", "salt2", 600_000, "a", "b", "c", "d", "e", "f"), CancellationToken.None);
 
         Assert.False(second.Succeeded);
     }
@@ -228,7 +231,7 @@ public class VaultServiceTests
     {
         var (_, _, service, _) = CreateService();
 
-        var result = await service.RewrapMasterKeyAsync(Guid.NewGuid(), new VaultRewrapDto("newSalt", 700_000, "newWrapped"), CancellationToken.None);
+        var result = await service.RewrapMasterKeyAsync(Guid.NewGuid(), new VaultRewrapDto("newSalt", 700_000, "newWrapped", null), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -240,13 +243,44 @@ public class VaultServiceTests
         var userId = Guid.NewGuid();
         await SetUpVaultAsync(service, userId);
 
-        var result = await service.RewrapMasterKeyAsync(userId, new VaultRewrapDto("newSalt", 700_000, "newWrapped"), CancellationToken.None);
+        var result = await service.RewrapMasterKeyAsync(userId, new VaultRewrapDto("newSalt", 700_000, "newWrapped", null), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         var profile = repo.Profiles.Single(p => p.UserId == userId);
         Assert.Equal("newSalt", profile.KdfSalt);
         Assert.Equal(700_000, profile.KdfIterations);
         Assert.Equal("newWrapped", profile.PrivateKeyWrappedByMasterKey);
+    }
+
+    [Fact]
+    public async Task RewrapMasterKeyAsync_LeavesMlKemSecretKeyUntouched_WhenNotProvided()
+    {
+        // A legacy (KeySchemeVersion 1) account's reset/recover flow never sends this field - make
+        // sure a null here doesn't accidentally null out (or otherwise touch) a hybrid account's
+        // already-stored ML-KEM secret key wrapping.
+        var (repo, _, service, _) = CreateService();
+        var userId = Guid.NewGuid();
+        await SetUpVaultAsync(service, userId);
+        var originalMlKemSecret = repo.Profiles.Single(p => p.UserId == userId).MlKemSecretKeyWrappedByMasterKey;
+
+        var result = await service.RewrapMasterKeyAsync(userId, new VaultRewrapDto("newSalt", 700_000, "newWrapped", null), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(originalMlKemSecret, repo.Profiles.Single(p => p.UserId == userId).MlKemSecretKeyWrappedByMasterKey);
+    }
+
+    [Fact]
+    public async Task RewrapMasterKeyAsync_UpdatesMlKemSecretKey_WhenProvided()
+    {
+        var (repo, _, service, _) = CreateService();
+        var userId = Guid.NewGuid();
+        await SetUpVaultAsync(service, userId);
+
+        var result = await service.RewrapMasterKeyAsync(
+            userId, new VaultRewrapDto("newSalt", 700_000, "newWrapped", "newMlKemSecretMaster"), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("newMlKemSecretMaster", repo.Profiles.Single(p => p.UserId == userId).MlKemSecretKeyWrappedByMasterKey);
     }
 
     [Fact]

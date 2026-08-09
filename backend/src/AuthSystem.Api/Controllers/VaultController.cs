@@ -41,7 +41,8 @@ public class VaultController(IVaultService vaultService) : ControllerBase
     [Authorize(Roles = "User")]
     public async Task<IActionResult> Recover(VaultRecoverRequest request, CancellationToken ct)
     {
-        var rewrap = new VaultRewrapDto(request.NewKdfSalt, request.NewKdfIterations, request.NewPrivateKeyWrappedByMasterKey);
+        var rewrap = new VaultRewrapDto(
+            request.NewKdfSalt, request.NewKdfIterations, request.NewPrivateKeyWrappedByMasterKey, request.NewMlKemSecretKeyWrappedByMasterKey);
         var result = await vaultService.RewrapMasterKeyAsync(User.GetUserId(), rewrap, ct);
         return result.Succeeded
             ? Ok(new { message = "Vault access restored." })
