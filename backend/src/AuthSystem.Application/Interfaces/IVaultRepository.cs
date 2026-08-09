@@ -20,8 +20,14 @@ public interface IVaultRepository
     Task<int> DeleteHoldersSharesByIdAsync(Guid holderUserId, CancellationToken ct);
     Task<IReadOnlyList<VaultItem>> GetItemsByOwnerAsync(Guid ownerUserId, CancellationToken ct);
     Task<VaultItem?> GetItemAsync(Guid itemId, Guid ownerUserId, CancellationToken ct);
+    Task<VaultItem?> GetItemByIdAsync(Guid itemId, CancellationToken ct);
     Task AddItemAsync(VaultItem item, CancellationToken ct);
     void RemoveItem(VaultItem item);
+
+    Task<VaultItemAttachment?> GetAttachmentAsync(Guid attachmentId, Guid vaultItemId, CancellationToken ct);
+    Task<IReadOnlyList<VaultItemAttachment>> GetAttachmentsByItemAsync(Guid vaultItemId, CancellationToken ct);
+    Task AddAttachmentAsync(VaultItemAttachment attachment, CancellationToken ct);
+    void RemoveAttachment(VaultItemAttachment attachment);
 
     Task SaveChangesAsync(CancellationToken ct);
 }

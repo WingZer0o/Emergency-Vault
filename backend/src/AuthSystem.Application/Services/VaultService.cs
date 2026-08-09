@@ -12,6 +12,7 @@ namespace AuthSystem.Application.Services;
 
 public class VaultService(
     IVaultRepository vaultRepository,
+    IVaultAttachmentBlobStore attachmentBlobStore,
     UserManager<ApplicationUser> userManager,
     IHotpService hotpService,
     IEmailSender emailSender,
@@ -20,6 +21,16 @@ public class VaultService(
     IOptions<VaultShareCodesOptions> vaultShareCodesOptions) : IVaultService
 {
     private readonly VaultShareCodesOptions _vaultShareCodesOptions = vaultShareCodesOptions.Value;
+
+    private static readonly HashSet<string> AllowedAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".docx" };
+    private static readonly HashSet<string> AllowedAttachmentContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+
+    // varbinary(max)'s 2^31-1 byte ceiling, minus the 16-byte AES-GCM auth tag appended to the ciphertext.
+    private const long MaxAttachmentSizeBytes = 2_147_483_631;
 
     public async Task<ServiceResult> SetupAsync(Guid userId, VaultSetupRequest request, CancellationToken ct)
     {
@@ -210,6 +221,127 @@ public class VaultService(
         await vaultRepository.SaveChangesAsync(ct);
         return ServiceResult.Success();
     }
+
+    public async Task<ServiceResult<VaultItemAttachmentDto>> UploadAttachmentAsync(
+        Guid callerId, Guid itemId, string fileName, string contentType, string ivBase64, long sizeBytes, Stream content, CancellationToken ct)
+    {
+        // Write access is owner-only, matching UpdateItemAsync/DeleteItemAsync - there is no
+        // shared-holder write path anywhere in the vault today.
+        var item = await vaultRepository.GetItemAsync(itemId, callerId, ct);
+        if (item is null)
+        {
+            return ServiceResult<VaultItemAttachmentDto>.Failure("Item not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName) || !AllowedAttachmentExtensions.Contains(Path.GetExtension(fileName)))
+        {
+            return ServiceResult<VaultItemAttachmentDto>.Failure("Only .pdf and .docx files are allowed.");
+        }
+
+        if (string.IsNullOrWhiteSpace(contentType) || !AllowedAttachmentContentTypes.Contains(contentType))
+        {
+            return ServiceResult<VaultItemAttachmentDto>.Failure("Only .pdf and .docx files are allowed.");
+        }
+
+        if (sizeBytes <= 0 || sizeBytes > MaxAttachmentSizeBytes)
+        {
+            return ServiceResult<VaultItemAttachmentDto>.Failure("File is too large.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ivBase64))
+        {
+            return ServiceResult<VaultItemAttachmentDto>.Failure("Missing encryption IV.");
+        }
+
+        var attachment = new VaultItemAttachment
+        {
+            Id = Guid.NewGuid(),
+            VaultItemId = item.Id,
+            FileName = fileName,
+            ContentType = contentType,
+            SizeBytes = sizeBytes,
+            Iv = ivBase64,
+        };
+
+        // Metadata row first (via EF, so it gets a generated Id others can reference), then the
+        // ciphertext bytes are streamed in separately via raw ADO.NET - see IVaultAttachmentBlobStore.
+        await vaultRepository.AddAttachmentAsync(attachment, ct);
+        await vaultRepository.SaveChangesAsync(ct);
+        await attachmentBlobStore.WriteAsync(attachment.Id, content, ct);
+
+        return ServiceResult<VaultItemAttachmentDto>.Success(ToAttachmentDto(attachment));
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<VaultItemAttachmentDto>>> GetAttachmentsAsync(Guid callerId, Guid itemId, CancellationToken ct)
+    {
+        var item = await vaultRepository.GetItemByIdAsync(itemId, ct);
+        if (item is null || !await CanAccessItemAsync(callerId, item.OwnerUserId, ct))
+        {
+            return ServiceResult<IReadOnlyList<VaultItemAttachmentDto>>.Failure("Item not found.");
+        }
+
+        var attachments = await vaultRepository.GetAttachmentsByItemAsync(item.Id, ct);
+        return ServiceResult<IReadOnlyList<VaultItemAttachmentDto>>.Success(attachments.Select(ToAttachmentDto).ToList());
+    }
+
+    public async Task<ServiceResult<(VaultItemAttachmentDto Meta, Stream Content)>> DownloadAttachmentAsync(
+        Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct)
+    {
+        var item = await vaultRepository.GetItemByIdAsync(itemId, ct);
+        if (item is null || !await CanAccessItemAsync(callerId, item.OwnerUserId, ct))
+        {
+            return ServiceResult<(VaultItemAttachmentDto Meta, Stream Content)>.Failure("Item not found.");
+        }
+
+        var attachment = await vaultRepository.GetAttachmentAsync(attachmentId, item.Id, ct);
+        if (attachment is null)
+        {
+            return ServiceResult<(VaultItemAttachmentDto Meta, Stream Content)>.Failure("Attachment not found.");
+        }
+
+        var stream = await attachmentBlobStore.OpenReadAsync(attachment.Id, ct);
+        return ServiceResult<(VaultItemAttachmentDto Meta, Stream Content)>.Success((ToAttachmentDto(attachment), stream));
+    }
+
+    public async Task<ServiceResult> DeleteAttachmentAsync(Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct)
+    {
+        // Write access is owner-only - same rationale as UploadAttachmentAsync.
+        var item = await vaultRepository.GetItemAsync(itemId, callerId, ct);
+        if (item is null)
+        {
+            return ServiceResult.Failure("Item not found.");
+        }
+
+        var attachment = await vaultRepository.GetAttachmentAsync(attachmentId, item.Id, ct);
+        if (attachment is null)
+        {
+            return ServiceResult.Failure("Attachment not found.");
+        }
+
+        vaultRepository.RemoveAttachment(attachment);
+        await vaultRepository.SaveChangesAsync(ct);
+        return ServiceResult.Success();
+    }
+
+    /// <summary>Owner-or-verified-share read-access check, mirroring the inline logic in GetSharedItemsAsync.</summary>
+    private async Task<bool> CanAccessItemAsync(Guid callerId, Guid ownerUserId, CancellationToken ct)
+    {
+        if (callerId == ownerUserId)
+        {
+            return true;
+        }
+
+        var share = await vaultRepository.GetActiveShareAsync(ownerUserId, callerId, ct);
+        if (share is null || share.VerifiedAt is null)
+        {
+            return false;
+        }
+
+        return await sharedVaultAccessGrantCache.HasValidGrantAsync(callerId, ownerUserId, ct);
+    }
+
+    private static VaultItemAttachmentDto ToAttachmentDto(VaultItemAttachment a) =>
+        new(a.Id, a.VaultItemId, a.FileName, a.ContentType, a.SizeBytes, a.Iv, a.CreatedAt);
 
     public async Task<ServiceResult<VaultUserLookupDto>> LookupUserAsync(string email, CancellationToken ct)
     {

@@ -69,6 +69,11 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
         return await db.VaultItems.FirstOrDefaultAsync(i => i.Id == itemId && i.OwnerUserId == ownerUserId, ct);
     }
 
+    public async Task<VaultItem?> GetItemByIdAsync(Guid itemId, CancellationToken ct)
+    {
+        return await db.VaultItems.FirstOrDefaultAsync(i => i.Id == itemId, ct);
+    }
+
     public async Task AddItemAsync(VaultItem item, CancellationToken ct)
     {
         await db.VaultItems.AddAsync(item, ct);
@@ -77,6 +82,39 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
     public void RemoveItem(VaultItem item)
     {
         db.VaultItems.Remove(item);
+    }
+
+    public async Task<VaultItemAttachment?> GetAttachmentAsync(Guid attachmentId, Guid vaultItemId, CancellationToken ct)
+    {
+        return await db.VaultItemAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId && a.VaultItemId == vaultItemId, ct);
+    }
+
+    public async Task<IReadOnlyList<VaultItemAttachment>> GetAttachmentsByItemAsync(Guid vaultItemId, CancellationToken ct)
+    {
+        // Excludes CiphertextBytes - listing metadata should never pull blob bytes through EF.
+        return await db.VaultItemAttachments
+            .Where(a => a.VaultItemId == vaultItemId)
+            .Select(a => new VaultItemAttachment
+            {
+                Id = a.Id,
+                VaultItemId = a.VaultItemId,
+                FileName = a.FileName,
+                ContentType = a.ContentType,
+                SizeBytes = a.SizeBytes,
+                Iv = a.Iv,
+                CreatedAt = a.CreatedAt,
+            })
+            .ToListAsync(ct);
+    }
+
+    public async Task AddAttachmentAsync(VaultItemAttachment attachment, CancellationToken ct)
+    {
+        await db.VaultItemAttachments.AddAsync(attachment, ct);
+    }
+
+    public void RemoveAttachment(VaultItemAttachment attachment)
+    {
+        db.VaultItemAttachments.Remove(attachment);
     }
 
     public async Task SaveChangesAsync(CancellationToken ct)

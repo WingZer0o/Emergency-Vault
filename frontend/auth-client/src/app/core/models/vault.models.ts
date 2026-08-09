@@ -131,3 +131,17 @@ export interface DecryptedVaultItem extends VaultItemPayload {
   createdAt: string;
   updatedAt: string;
 }
+
+/** An encrypted file attached to a vault item. FileName/ContentType/SizeBytes are cleartext (a
+ * deliberate, narrow exception to the vault's zero-knowledge model) so the server can enforce the
+ * PDF/DOCX allowlist and the client can label a download without decrypting first; the file's
+ * bytes themselves are only ever fetched and decrypted on demand. */
+export interface VaultItemAttachmentDto {
+  id: string;
+  vaultItemId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  iv: string;
+  createdAt: string;
+}

@@ -17,4 +17,10 @@ public class FakeEmailSender : IEmailSender
         VaultShareCodesSent.Add((toEmail, code, ownerDisplayName));
         return Task.CompletedTask;
     }
+
+    public Task SendSharedVaultAccessCodeAsync(string toEmail, string code, string ownerDisplayName, CancellationToken ct)
+    {
+        VaultShareCodesSent.Add((toEmail, code, ownerDisplayName));
+        return Task.CompletedTask;
+    }
 }

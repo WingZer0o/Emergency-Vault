@@ -97,6 +97,57 @@ public class VaultController(IVaultService vaultService) : ControllerBase
         return result.Succeeded ? NoContent() : NotFound(new { errors = result.Errors });
     }
 
+    [HttpPost("items/{id:guid}/attachments")]
+    [Authorize(Roles = "User")]
+    [DisableRequestSizeLimit]
+    public async Task<IActionResult> UploadAttachment(Guid id, CancellationToken ct)
+    {
+        var fileName = Request.Headers["X-File-Name"].ToString();
+        var contentType = Request.Headers["X-File-Content-Type"].ToString();
+        var iv = Request.Headers["X-File-Iv"].ToString();
+        if (!long.TryParse(Request.Headers["X-File-Size"], out var sizeBytes))
+        {
+            return BadRequest(new { errors = new[] { "Missing or invalid X-File-Size header." } });
+        }
+
+        var result = await vaultService.UploadAttachmentAsync(
+            User.GetUserId(), id, fileName, contentType, iv, sizeBytes, Request.Body, ct);
+        return result.Succeeded ? Created(string.Empty, result.Data) : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpGet("items/{id:guid}/attachments")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> GetAttachments(Guid id, CancellationToken ct)
+    {
+        var result = await vaultService.GetAttachmentsAsync(User.GetUserId(), id, ct);
+        return result.Succeeded ? Ok(result.Data) : NotFound(new { errors = result.Errors });
+    }
+
+    [HttpGet("items/{id:guid}/attachments/{attachmentId:guid}")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> DownloadAttachment(Guid id, Guid attachmentId, CancellationToken ct)
+    {
+        var result = await vaultService.DownloadAttachmentAsync(User.GetUserId(), id, attachmentId, ct);
+        if (!result.Succeeded)
+        {
+            return NotFound(new { errors = result.Errors });
+        }
+
+        var (meta, content) = result.Data;
+
+        // Content-Type is deliberately application/octet-stream, not the original PDF/DOCX MIME
+        // type - the body is still ciphertext until the browser decrypts it client-side.
+        return File(content, "application/octet-stream", meta.FileName);
+    }
+
+    [HttpDelete("items/{id:guid}/attachments/{attachmentId:guid}")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> DeleteAttachment(Guid id, Guid attachmentId, CancellationToken ct)
+    {
+        var result = await vaultService.DeleteAttachmentAsync(User.GetUserId(), id, attachmentId, ct);
+        return result.Succeeded ? NoContent() : NotFound(new { errors = result.Errors });
+    }
+
     [HttpGet("lookup")]
     [Authorize(Roles = "User")]
     public async Task<IActionResult> Lookup([FromQuery] string email, CancellationToken ct)

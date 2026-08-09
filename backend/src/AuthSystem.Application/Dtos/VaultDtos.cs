@@ -40,6 +40,9 @@ public record UpdateVaultItemRequest([Required] string CiphertextBlob);
 
 public record VaultItemDto(Guid Id, string CiphertextBlob, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
+public record VaultItemAttachmentDto(
+    Guid Id, Guid VaultItemId, string FileName, string ContentType, long SizeBytes, string Iv, DateTimeOffset CreatedAt);
+
 public record VaultUserLookupDto(Guid UserId, string FirstName, string LastName, string PublicKey, string? MlKemPublicKey);
 
 public record CreateVaultShareRequest(

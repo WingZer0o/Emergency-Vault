@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
@@ -9,6 +9,7 @@ import {
   ResendSharedVaultAccessRequest,
   SharedVaultAccessChallengeDto,
   UpdateVaultItemRequest,
+  VaultItemAttachmentDto,
   VaultItemDto,
   VaultRecoverRequest,
   VaultResetRecoveryBundleDto,
@@ -71,6 +72,42 @@ export class VaultService {
 
   deleteItem(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/items/${id}`);
+  }
+
+  /** Uploads already-encrypted file bytes. Metadata rides in headers since the body is the raw
+   * ciphertext (not JSON/multipart) - avoids base64 overhead on what's already binary. */
+  uploadAttachment(
+    itemId: string,
+    fileName: string,
+    contentType: string,
+    ivB64: string,
+    sizeBytes: number,
+    ciphertext: ArrayBuffer,
+  ): Observable<HttpEvent<VaultItemAttachmentDto>> {
+    return this.http.post<VaultItemAttachmentDto>(`${this.baseUrl}/items/${itemId}/attachments`, ciphertext, {
+      headers: {
+        'X-File-Name': fileName,
+        'X-File-Content-Type': contentType,
+        'X-File-Iv': ivB64,
+        'X-File-Size': String(sizeBytes),
+        'Content-Type': 'application/octet-stream',
+      },
+      reportProgress: true,
+      observe: 'events',
+    });
+  }
+
+  getAttachments(itemId: string): Observable<VaultItemAttachmentDto[]> {
+    return this.http.get<VaultItemAttachmentDto[]>(`${this.baseUrl}/items/${itemId}/attachments`);
+  }
+
+  /** Returns the still-encrypted file bytes - caller decrypts with decryptFileBytes before use. */
+  downloadAttachment(itemId: string, attachmentId: string): Observable<ArrayBuffer> {
+    return this.http.get(`${this.baseUrl}/items/${itemId}/attachments/${attachmentId}`, { responseType: 'arraybuffer' });
+  }
+
+  deleteAttachment(itemId: string, attachmentId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/items/${itemId}/attachments/${attachmentId}`);
   }
 
   lookupUser(email: string): Observable<VaultUserLookupDto> {

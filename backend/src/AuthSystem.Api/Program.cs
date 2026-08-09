@@ -27,6 +27,15 @@ builder.Services.AddSingleton(signingKey);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplicationServices();
 
+// Raises Kestrel's ~30MB default so vault-item file attachments can approach SQL Server's
+// varbinary(max) ceiling (2^31-1 bytes). This is a process-wide default, not per-route - Kestrel
+// has no per-endpoint body size config - the upload action additionally uses
+// [DisableRequestSizeLimit] to remove ASP.NET Core's separate request-size feature check.
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = 2_147_483_648; // 2 GiB
+});
+
 builder.Services.AddDataProtection()
     .SetApplicationName("AuthSystem");
 

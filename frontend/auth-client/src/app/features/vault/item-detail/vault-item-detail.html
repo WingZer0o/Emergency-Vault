@@ -24,6 +24,53 @@
           }
         </dl>
 
+        <div class="attachments">
+          <h3>Attachments</h3>
+
+          @if (attachments().length > 0) {
+            <ul class="attachment-list">
+              @for (attachment of attachments(); track attachment.id) {
+                <li>
+                  <mat-icon>description</mat-icon>
+                  <span>{{ attachment.fileName }}</span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="downloadAttachment(attachment)"
+                    [disabled]="downloadingId() === attachment.id"
+                    aria-label="Download file"
+                  >
+                    <mat-icon>download</mat-icon>
+                  </button>
+                  <button mat-icon-button type="button" (click)="deleteAttachment(attachment)" aria-label="Delete file">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+
+          <input
+            #fileInput
+            type="file"
+            multiple
+            accept=".pdf,.docx"
+            hidden
+            (change)="addFiles(fileInput.files); fileInput.value = ''"
+          />
+          <button mat-stroked-button type="button" (click)="fileInput.click()">
+            <mat-icon>attach_file</mat-icon>
+            Attach PDF or DOCX
+          </button>
+
+          @if (uploadingLabel(); as label) {
+            <p class="uploading-text">
+              <mat-progress-spinner diameter="16" mode="indeterminate" />
+              Uploading {{ label }}…
+            </p>
+          }
+        </div>
+
         @if (errorMessage(); as message) {
           <p class="error-text">{{ message }}</p>
         }
@@ -62,13 +109,7 @@
                   <mat-label>Value</mat-label>
                   <input matInput formControlName="value" />
                 </mat-form-field>
-                <button
-                  mat-icon-button
-                  type="button"
-                  (click)="removeField($index)"
-                  [disabled]="fields.length === 1"
-                  aria-label="Remove field"
-                >
+                <button mat-icon-button type="button" (click)="removeField($index)" aria-label="Remove field">
                   <mat-icon>remove_circle_outline</mat-icon>
                 </button>
               </div>

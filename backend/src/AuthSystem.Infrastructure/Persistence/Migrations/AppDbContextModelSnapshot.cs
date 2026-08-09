@@ -237,6 +237,46 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("VaultItems", (string)null);
                 });
 
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultItemAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("CiphertextBytes")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Iv")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("VaultItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VaultItemId");
+
+                    b.ToTable("VaultItemAttachments", (string)null);
+                });
+
             modelBuilder.Entity("AuthSystem.Domain.Entities.VaultKeyShare", b =>
                 {
                     b.Property<Guid>("Id")
@@ -477,6 +517,17 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultItemAttachment", b =>
+                {
+                    b.HasOne("AuthSystem.Domain.Entities.VaultItem", "VaultItem")
+                        .WithMany()
+                        .HasForeignKey("VaultItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("VaultItem");
                 });
 
             modelBuilder.Entity("AuthSystem.Domain.Entities.VaultKeyShare", b =>

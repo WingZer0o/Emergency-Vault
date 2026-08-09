@@ -12,6 +12,7 @@ public class FakeVaultRepository : IVaultRepository
     public readonly List<VaultProfile> Profiles = [];
     public readonly List<VaultItem> Items = [];
     public readonly List<VaultKeyShare> Shares = [];
+    public readonly List<VaultItemAttachment> Attachments = [];
 
     public Task<VaultProfile?> GetProfileAsync(Guid userId, CancellationToken ct) =>
         Task.FromResult(Profiles.FirstOrDefault(p => p.UserId == userId));
@@ -50,11 +51,20 @@ public class FakeVaultRepository : IVaultRepository
 
     public void RemoveShare(VaultKeyShare share) => Shares.Remove(share);
 
+    public Task<int> DeleteHoldersSharesByIdAsync(Guid holderUserId, CancellationToken ct)
+    {
+        var removed = Shares.RemoveAll(s => s.HolderUserId == holderUserId);
+        return Task.FromResult(removed);
+    }
+
     public Task<IReadOnlyList<VaultItem>> GetItemsByOwnerAsync(Guid ownerUserId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<VaultItem>>(Items.Where(i => i.OwnerUserId == ownerUserId).ToList());
 
     public Task<VaultItem?> GetItemAsync(Guid itemId, Guid ownerUserId, CancellationToken ct) =>
         Task.FromResult(Items.FirstOrDefault(i => i.Id == itemId && i.OwnerUserId == ownerUserId));
+
+    public Task<VaultItem?> GetItemByIdAsync(Guid itemId, CancellationToken ct) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.Id == itemId));
 
     public Task AddItemAsync(VaultItem item, CancellationToken ct)
     {
@@ -63,6 +73,20 @@ public class FakeVaultRepository : IVaultRepository
     }
 
     public void RemoveItem(VaultItem item) => Items.Remove(item);
+
+    public Task<VaultItemAttachment?> GetAttachmentAsync(Guid attachmentId, Guid vaultItemId, CancellationToken ct) =>
+        Task.FromResult(Attachments.FirstOrDefault(a => a.Id == attachmentId && a.VaultItemId == vaultItemId));
+
+    public Task<IReadOnlyList<VaultItemAttachment>> GetAttachmentsByItemAsync(Guid vaultItemId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<VaultItemAttachment>>(Attachments.Where(a => a.VaultItemId == vaultItemId).ToList());
+
+    public Task AddAttachmentAsync(VaultItemAttachment attachment, CancellationToken ct)
+    {
+        Attachments.Add(attachment);
+        return Task.CompletedTask;
+    }
+
+    public void RemoveAttachment(VaultItemAttachment attachment) => Attachments.Remove(attachment);
 
     public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
 }

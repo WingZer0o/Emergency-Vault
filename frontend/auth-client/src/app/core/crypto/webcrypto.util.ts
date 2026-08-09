@@ -166,6 +166,25 @@ export async function decryptItemPayload<T>(uvk: CryptoKey, blobB64: string): Pr
   return JSON.parse(new TextDecoder().decode(plaintext)) as T;
 }
 
+export interface EncryptedFile {
+  ivB64: string;
+  ciphertext: ArrayBuffer;
+}
+
+/** Encrypts raw file bytes for a vault item attachment. Kept separate from encryptItemPayload -
+ * no JSON stringify or base64 round-trip of the (potentially large) file body, so the ciphertext
+ * can go straight to HttpClient as a binary request body. There is no streaming AES-GCM API in
+ * WebCrypto, so the whole file is necessarily held in memory here. */
+export async function encryptFileBytes(uvk: CryptoKey, plaintext: ArrayBuffer): Promise<EncryptedFile> {
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
+  const ciphertext = await crypto.subtle.encrypt({ name: AES_ALGO, iv }, uvk, plaintext);
+  return { ivB64: toBase64(iv), ciphertext };
+}
+
+export async function decryptFileBytes(uvk: CryptoKey, ivB64: string, ciphertext: ArrayBuffer): Promise<ArrayBuffer> {
+  return crypto.subtle.decrypt({ name: AES_ALGO, iv: fromBase64(ivB64) }, uvk, ciphertext);
+}
+
 export async function exportPublicKeySpki(publicKey: CryptoKey): Promise<string> {
   return toBase64(await crypto.subtle.exportKey('spki', publicKey));
 }

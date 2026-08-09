@@ -16,6 +16,13 @@ public interface IVaultService
     Task<ServiceResult<VaultItemDto>> UpdateItemAsync(Guid ownerUserId, Guid itemId, UpdateVaultItemRequest request, CancellationToken ct);
     Task<ServiceResult> DeleteItemAsync(Guid ownerUserId, Guid itemId, CancellationToken ct);
 
+    Task<ServiceResult<VaultItemAttachmentDto>> UploadAttachmentAsync(
+        Guid callerId, Guid itemId, string fileName, string contentType, string ivBase64, long sizeBytes, Stream content, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultItemAttachmentDto>>> GetAttachmentsAsync(Guid callerId, Guid itemId, CancellationToken ct);
+    Task<ServiceResult<(VaultItemAttachmentDto Meta, Stream Content)>> DownloadAttachmentAsync(
+        Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct);
+    Task<ServiceResult> DeleteAttachmentAsync(Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct);
+
     Task<ServiceResult<VaultUserLookupDto>> LookupUserAsync(string email, CancellationToken ct);
     Task<ServiceResult<VaultShareDto>> CreateShareAsync(Guid ownerUserId, CreateVaultShareRequest request, CancellationToken ct);
     Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetSharesAsync(Guid ownerUserId, CancellationToken ct);

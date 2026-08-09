@@ -33,13 +33,7 @@
                 <mat-label>Value</mat-label>
                 <input matInput formControlName="value" />
               </mat-form-field>
-              <button
-                mat-icon-button
-                type="button"
-                (click)="removeField($index)"
-                [disabled]="fields.length === 1"
-                aria-label="Remove field"
-              >
+              <button mat-icon-button type="button" (click)="removeField($index)" aria-label="Remove field">
                 <mat-icon>remove_circle_outline</mat-icon>
               </button>
             </div>
@@ -50,6 +44,44 @@
           <mat-icon>add</mat-icon>
           Add field
         </button>
+
+        <div class="attachments">
+          <h3>Attachments</h3>
+
+          @if (stagedFiles().length > 0) {
+            <ul class="attachment-list">
+              @for (file of stagedFiles(); track file.name; let i = $index) {
+                <li>
+                  <mat-icon>description</mat-icon>
+                  <span>{{ file.name }}</span>
+                  <button mat-icon-button type="button" (click)="removeStagedFile(i)" aria-label="Remove file">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+
+          <input
+            #fileInput
+            type="file"
+            multiple
+            accept=".pdf,.docx"
+            hidden
+            (change)="addFiles(fileInput.files); fileInput.value = ''"
+          />
+          <button mat-stroked-button type="button" (click)="fileInput.click()">
+            <mat-icon>attach_file</mat-icon>
+            Attach PDF or DOCX
+          </button>
+        </div>
+
+        @if (uploadingLabel(); as label) {
+          <p class="uploading-text">
+            <mat-progress-spinner diameter="16" mode="indeterminate" />
+            Uploading {{ label }}…
+          </p>
+        }
 
         @if (errorMessage(); as message) {
           <p class="error-text">{{ message }}</p>

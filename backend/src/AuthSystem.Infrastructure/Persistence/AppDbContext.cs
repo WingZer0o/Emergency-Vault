@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UserFailedLogin> UserFailedLogins => Set<UserFailedLogin>();
     public DbSet<VaultProfile> VaultProfiles => Set<VaultProfile>();
     public DbSet<VaultItem> VaultItems => Set<VaultItem>();
+    public DbSet<VaultItemAttachment> VaultItemAttachments => Set<VaultItemAttachment>();
     public DbSet<VaultKeyShare> VaultKeyShares => Set<VaultKeyShare>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -76,6 +77,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasOne(i => i.Owner)
                 .WithMany()
                 .HasForeignKey(i => i.OwnerUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<VaultItemAttachment>(e =>
+        {
+            e.ToTable("VaultItemAttachments");
+            e.HasKey(a => a.Id);
+            e.Property(a => a.FileName).HasMaxLength(255).IsRequired();
+            e.Property(a => a.ContentType).HasMaxLength(255).IsRequired();
+            e.Property(a => a.Iv).IsRequired();
+            e.Property(a => a.CiphertextBytes).HasColumnType("varbinary(max)").IsRequired();
+            e.HasIndex(a => a.VaultItemId);
+            e.HasOne(a => a.VaultItem)
+                .WithMany()
+                .HasForeignKey(a => a.VaultItemId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

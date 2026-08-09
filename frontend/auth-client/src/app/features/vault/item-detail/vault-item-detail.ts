@@ -1,6 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { HttpErrorResponse, HttpEventType, HttpResponse } from '@angular/common/http';
+import { filter, firstValueFrom } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -9,12 +11,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { decryptItemPayload, encryptItemPayload } from '../../../core/crypto/webcrypto.util';
-import { VaultItemPayload } from '../../../core/models/vault.models';
+import { decryptFileBytes, decryptItemPayload, encryptFileBytes, encryptItemPayload } from '../../../core/crypto/webcrypto.util';
+import { VaultItemAttachmentDto, VaultItemPayload } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
-import { VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
+import { ALLOWED_ATTACHMENT_EXTENSIONS, VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
 
 @Component({
   selector: 'app-vault-item-detail',
@@ -47,6 +49,9 @@ export class VaultItemDetail implements OnInit {
   readonly editing = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly revealedFields = signal<ReadonlySet<number>>(new Set());
+  readonly attachments = signal<VaultItemAttachmentDto[]>([]);
+  readonly uploadingLabel = signal<string | null>(null);
+  readonly downloadingId = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     label: ['', [Validators.required]],
@@ -76,6 +81,11 @@ export class VaultItemDetail implements OnInit {
         this.loading.set(false);
         this.errorMessage.set(extractErrorMessage(err, 'Could not load this item.'));
       },
+    });
+
+    this.vaultService.getAttachments(this.itemId).subscribe({
+      next: (attachments) => this.attachments.set(attachments),
+      error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not load attachments.')),
     });
   }
 
@@ -151,6 +161,71 @@ export class VaultItemDetail implements OnInit {
       next: () => this.router.navigateByUrl('/vault'),
       error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not delete item.')),
     });
+  }
+
+  async addFiles(fileList: FileList | null): Promise<void> {
+    if (!fileList) {
+      return;
+    }
+
+    const files = Array.from(fileList);
+    if (files.some((file) => !this.hasAllowedExtension(file.name))) {
+      this.errorMessage.set('Only .pdf and .docx files are allowed.');
+      return;
+    }
+
+    this.errorMessage.set(null);
+    for (const file of files) {
+      try {
+        this.uploadingLabel.set(file.name);
+        const buffer = await file.arrayBuffer();
+        const { ivB64, ciphertext } = await encryptFileBytes(this.vaultSession.uvk, buffer);
+        const response = await firstValueFrom(
+          this.vaultService
+            .uploadAttachment(this.itemId, file.name, file.type, ivB64, file.size, ciphertext)
+            .pipe(filter((e): e is HttpResponse<VaultItemAttachmentDto> => e.type === HttpEventType.Response)),
+        );
+        if (response.body) {
+          this.attachments.update((current) => [...current, response.body!]);
+        }
+      } catch (err) {
+        const fallback = `Could not upload ${file.name}.`;
+        this.errorMessage.set(err instanceof HttpErrorResponse ? extractErrorMessage(err, fallback) : fallback);
+      }
+    }
+    this.uploadingLabel.set(null);
+  }
+
+  async downloadAttachment(attachment: VaultItemAttachmentDto): Promise<void> {
+    this.downloadingId.set(attachment.id);
+    this.errorMessage.set(null);
+    try {
+      const ciphertext = await firstValueFrom(this.vaultService.downloadAttachment(this.itemId, attachment.id));
+      const plaintext = await decryptFileBytes(this.vaultSession.uvk, attachment.iv, ciphertext);
+      const blob = new Blob([plaintext], { type: attachment.contentType });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = attachment.fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      this.errorMessage.set(`Could not download ${attachment.fileName}.`);
+    } finally {
+      this.downloadingId.set(null);
+    }
+  }
+
+  deleteAttachment(attachment: VaultItemAttachmentDto): void {
+    this.vaultService.deleteAttachment(this.itemId, attachment.id).subscribe({
+      next: () => this.attachments.update((current) => current.filter((a) => a.id !== attachment.id)),
+      error: (err) => this.errorMessage.set(extractErrorMessage(err, `Could not delete ${attachment.fileName}.`)),
+    });
+  }
+
+  private hasAllowedExtension(fileName: string): boolean {
+    const lower = fileName.toLowerCase();
+    return ALLOWED_ATTACHMENT_EXTENSIONS.some((ext) => lower.endsWith(ext));
   }
 
   private createFieldGroup(name = '', value = '') {
