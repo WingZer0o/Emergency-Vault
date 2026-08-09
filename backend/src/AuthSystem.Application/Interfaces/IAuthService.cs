@@ -18,4 +18,5 @@ public interface IAuthService
     Task<bool> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct);
     Task<ServiceResult> EnableTwoFactorAsync(Guid userId, CancellationToken ct);
     Task<ServiceResult> DisableTwoFactorAsync(Guid userId, CancellationToken ct);
+    Task<ServiceResult> DeleteAccountAsync(Guid userId, CancellationToken ct);
 }

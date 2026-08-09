@@ -205,6 +205,24 @@ public class VaultServiceTests
     }
 
     [Fact]
+    public async Task ReleaseHeldSharesAsync_RemovesEveryShareHeldByUser_IncludingSelfShare()
+    {
+        var (repo, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+
+        await service.ReleaseHeldSharesAsync(holder.Id, CancellationToken.None);
+
+        // Every row where holder is the Holder - their own self-share and the cross-user grant - is gone.
+        Assert.DoesNotContain(repo.Shares, s => s.HolderUserId == holder.Id);
+        // Rows where holder is only the VaultOwner (irrelevant here) or another user's self-share are untouched.
+        Assert.Contains(repo.Shares, s => s.VaultOwnerUserId == owner.Id && s.HolderUserId == owner.Id);
+    }
+
+    [Fact]
     public async Task GetSharedItemsAsync_Fails_AfterRevocation()
     {
         var (_, users, service, email) = CreateService();

@@ -38,25 +38,24 @@
     </mat-card-content>
   </mat-card>
 
-  @if (authService.hasRole('Admin')) {
-    <mat-card class="admin-card">
-      <mat-card-header>
-        <mat-card-title>All users (Admin only)</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @if (usersLoading()) {
-          <mat-progress-spinner diameter="28" mode="indeterminate" />
+  <mat-card class="delete-profile-card">
+<mat-card-header>
+      <mat-card-title>Delete Profile</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p class="warning-text">
+        Deleting your profile is permanent and cannot be undone. All your data will be lost.
+      </p>
+      <button mat-raised-button color="warn" [disabled]="deleteInProgress()" (click)="onDeleteProfile()">
+        @if (deleteInProgress()) {
+          <mat-progress-spinner diameter="18" mode="indeterminate" />
         } @else {
-          <mat-list>
-            @for (user of users(); track user.id) {
-              <mat-list-item>
-                <span matListItemTitle>{{ user.firstName }} {{ user.lastName }}</span>
-                <span matListItemLine>{{ user.email }} - {{ user.roles.join(', ') }}</span>
-              </mat-list-item>
-            }
-          </mat-list>
+          Delete Profile
         }
-      </mat-card-content>
-    </mat-card>
-  }
+      </button>
+      @if (deleteError(); as message) {
+        <p class="error-text">{{ message }}</p>
+      }
+    </mat-card-content>
+  </mat-card>
 </div>

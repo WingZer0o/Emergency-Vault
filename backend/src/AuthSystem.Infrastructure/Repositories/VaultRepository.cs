@@ -44,9 +44,19 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
             .ToListAsync(ct);
     }
 
+    public async Task<int> DeleteHoldersSharesByIdAsync(Guid holderUserId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares.Where(s => s.HolderUserId == holderUserId).ExecuteDeleteAsync(ct);
+    }
+
     public async Task AddShareAsync(VaultKeyShare share, CancellationToken ct)
     {
         await db.VaultKeyShares.AddAsync(share, ct);
+    }
+
+    public void RemoveShare(VaultKeyShare share)
+    {
+        db.VaultKeyShares.Remove(share);
     }
 
     public async Task<IReadOnlyList<VaultItem>> GetItemsByOwnerAsync(Guid ownerUserId, CancellationToken ct)

@@ -18,6 +18,7 @@ public class AuthService(
     IRefreshTokenRepository refreshTokenRepository,
     IRefreshTokenCache refreshTokenCache,
     IUserFailedLoginRepository userFailedLoginRepository,
+    IVaultRepository vaultRepository,
     IEmailSender emailSender,
     IVaultService vaultService,
     IOptions<JwtOptions> jwtOptions,
@@ -379,6 +380,24 @@ public class AuthService(
         }
 
         return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult> DeleteAccountAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ServiceResult.Failure("User not found.");
+        }
+
+        // Must run before UserManager.DeleteAsync: VaultProfile, owned VaultItems and granted
+        // VaultKeyShares all cascade-delete with the user, but VaultKeyShare.Holder is a Restrict
+        // FK (see AppDbContext), so any share this user holds - including their own self-share -
+        // would otherwise block the delete with a FK constraint violation.
+        await vaultRepository.DeleteHoldersSharesByIdAsync(userId, ct);
+
+        var result = await userManager.DeleteAsync(user);
+        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
     }
 
     public async Task<UserProfileDto?> GetProfileAsync(Guid userId, CancellationToken ct)

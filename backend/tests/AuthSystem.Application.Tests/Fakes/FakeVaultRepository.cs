@@ -39,11 +39,16 @@ public class FakeVaultRepository : IVaultRepository
             .Where(s => s.HolderUserId == holderUserId && s.VaultOwnerUserId != holderUserId && s.RevokedAt is null)
             .ToList());
 
+    public Task<IReadOnlyList<VaultKeyShare>> GetSharesHeldByAsync(Guid holderUserId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<VaultKeyShare>>(Shares.Where(s => s.HolderUserId == holderUserId).ToList());
+
     public Task AddShareAsync(VaultKeyShare share, CancellationToken ct)
     {
         Shares.Add(share);
         return Task.CompletedTask;
     }
+
+    public void RemoveShare(VaultKeyShare share) => Shares.Remove(share);
 
     public Task<IReadOnlyList<VaultItem>> GetItemsByOwnerAsync(Guid ownerUserId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<VaultItem>>(Items.Where(i => i.OwnerUserId == ownerUserId).ToList());

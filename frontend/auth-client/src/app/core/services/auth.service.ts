@@ -84,6 +84,11 @@ export class AuthService {
     return this.http.post(`${this.baseUrl}/logout`, {}).pipe(finalize(() => this.clearSession()));
   }
 
+  /** Permanently deletes the current user's profile and all of their vault secrets. */
+  deleteAccount(): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/account`).pipe(tap(() => this.clearSession()));
+  }
+
   confirmEmail(userId: string, token: string): Observable<{ message: string }> {
     return this.http.get<{ message: string }>(`${this.baseUrl}/confirm-email`, { params: { userId, token } });
   }

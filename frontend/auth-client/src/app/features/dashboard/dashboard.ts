@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatListModule } from '@angular/material/list';
 import { MatChipsModule } from '@angular/material/chips';
@@ -8,17 +9,24 @@ import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/sl
 
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
+import { VaultSessionService } from '../../core/services/vault-session.service';
 import { UserProfile } from '../../core/models/auth.models';
+import { MatButtonModule } from '@angular/material/button';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
+import { extractErrorMessage } from '../auth/auth-error.util';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [MatCardModule, MatListModule, MatChipsModule, MatProgressSpinnerModule, MatSlideToggleModule],
+  imports: [MatCardModule, MatListModule, MatButtonModule, MatChipsModule, MatProgressSpinnerModule, MatSlideToggleModule],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
 export class Dashboard implements OnInit {
   private readonly http = inject(HttpClient);
   protected readonly authService = inject(AuthService);
+  private readonly vaultSession = inject(VaultSessionService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly router = inject(Router);
 
   readonly users = signal<UserProfile[] | null>(null);
   readonly usersLoading = signal(false);
@@ -28,11 +36,10 @@ export class Dashboard implements OnInit {
   readonly twoFactorSaving = signal(false);
   readonly twoFactorError = signal<string | null>(null);
 
-  ngOnInit(): void {
-    if (this.authService.hasRole('Admin')) {
-      this.loadUsers();
-    }
+  readonly deleteInProgress = signal(false);
+  readonly deleteError = signal<string | null>(null);
 
+  ngOnInit(): void {
     this.loadTwoFactorStatus();
   }
 
@@ -67,14 +74,34 @@ export class Dashboard implements OnInit {
     });
   }
 
-  private loadUsers(): void {
-    this.usersLoading.set(true);
-    this.http.get<UserProfile[]>(`${environment.apiUrl}/users`).subscribe({
-      next: (users) => {
-        this.users.set(users);
-        this.usersLoading.set(false);
+  public onDeleteProfile(): void {
+    this.confirmDialog
+      .confirm({
+        title: 'Delete profile',
+        message:
+          'This will permanently delete your profile and all of your vault secrets. This cannot be undone.',
+        confirmText: 'Delete profile',
+        danger: true,
+      })
+      .subscribe((confirmed) => {
+        if (confirmed) {
+          this.deleteProfile();
+        }
+      });
+  }
+
+  private deleteProfile(): void {
+    this.deleteInProgress.set(true);
+    this.deleteError.set(null);
+
+    this.authService.deleteAccount().subscribe({
+      next: () => {
+        this.vaultSession.lock().then(() => this.router.navigateByUrl('/login'));
       },
-      error: () => this.usersLoading.set(false),
+      error: (err) => {
+        this.deleteInProgress.set(false);
+        this.deleteError.set(extractErrorMessage(err, 'Could not delete profile. Please try again.'));
+      },
     });
   }
 }

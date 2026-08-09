@@ -135,15 +135,29 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     [HttpGet("me")]
-    [Authorize]
+    [Authorize(Roles="User")]
     public async Task<IActionResult> Me(CancellationToken ct)
     {
         var profile = await authService.GetProfileAsync(User.GetUserId(), ct);
         return profile is null ? NotFound() : Ok(profile);
     }
 
+    [HttpDelete("account")]
+    [Authorize(Roles="User")]
+    public async Task<IActionResult> DeleteAccount(CancellationToken ct)
+    {
+        var result = await authService.DeleteAccountAsync(User.GetUserId(), ct);
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { errors = result.Errors });
+        }
+
+        Response.Cookies.Delete(CookieConst.RefreshCookieName);
+        return NoContent();
+    }
+
     [HttpGet("two-factor/status")]
-    [Authorize]
+    [Authorize(Roles="User")]
     public async Task<IActionResult> TwoFactorStatus(CancellationToken ct)
     {
         var enabled = await authService.GetTwoFactorStatusAsync(User.GetUserId(), ct);
@@ -151,7 +165,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     [HttpPost("two-factor/enable")]
-    [Authorize]
+    [Authorize(Roles="User")]
     public async Task<IActionResult> EnableTwoFactor(CancellationToken ct)
     {
         var result = await authService.EnableTwoFactorAsync(User.GetUserId(), ct);
@@ -161,7 +175,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     [HttpPost("two-factor/disable")]
-    [Authorize]
+    [Authorize(Roles="User")]
     public async Task<IActionResult> DisableTwoFactor(CancellationToken ct)
     {
         var result = await authService.DisableTwoFactorAsync(User.GetUserId(), ct);

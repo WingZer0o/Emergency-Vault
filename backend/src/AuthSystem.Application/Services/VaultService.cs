@@ -309,7 +309,7 @@ public class VaultService(
         await vaultRepository.SaveChangesAsync(ct);
         return ServiceResult.Success();
     }
-
+       
     public async Task<ServiceResult<IReadOnlyList<VaultSharedWithMeDto>>> GetSharedWithMeAsync(Guid holderUserId, CancellationToken ct)
     {
         var shares = await vaultRepository.GetActiveSharesHeldByAsync(holderUserId, ct);
