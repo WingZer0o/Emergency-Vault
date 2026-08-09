@@ -1,0 +1,202 @@
+<div class="landing">
+  <nav class="nav">
+    <span class="nav-brand">AuthSystem</span>
+    <a href="#how-it-works">How it works</a>
+    <a href="#cryptography">Cryptography</a>
+    <a href="#use-cases">For executors</a>
+    @if (authService.isAuthenticated()) {
+      <a class="btn btn-primary" routerLink="/dashboard" style="margin-left: 8px">Go to dashboard</a>
+    } @else {
+      <a class="btn btn-secondary" routerLink="/login" style="margin-left: 8px">Sign in</a>
+    }
+  </nav>
+
+  <header class="hero">
+    <div class="hero-copy">
+      <div class="kicker">Zero-knowledge vault sharing</div>
+      <h1>The credentials your family will need. Sealed so only they can open them.</h1>
+      <p class="lead">
+        Power-of-attorney logins, institution portals, point-of-death paperwork — encrypted in
+        your browser before anything leaves it. We hold ciphertext and nothing else.
+      </p>
+      <p class="text-muted">
+        Your password never reaches our servers. Neither does a key that could decrypt your
+        vault. Lose the password and your recovery key and the data is unrecoverable — by
+        design, including by us.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#how-it-works">See how it works</a>
+        @if (authService.isAuthenticated()) {
+          <a class="btn btn-secondary" routerLink="/vault/setup">Create a vault</a>
+        } @else {
+          <a class="btn btn-secondary" routerLink="/register">Create a vault</a>
+        }
+      </div>
+      <div class="crypto-badges">
+        <span>AES-256-GCM</span>
+        <span>PBKDF2 &middot; 600,000 iterations</span>
+        <span>RSA-3072 + ML-KEM-768</span>
+      </div>
+    </div>
+    <div class="ph grayscale hero-photo"><span>Photograph — hands, documents on a desk (B/W)</span></div>
+  </header>
+
+  <section class="section-block" id="how-it-works">
+    <h6>How it works</h6>
+    <div class="col-3">
+      <div class="col">
+        <div class="step-num">01</div>
+        <h3>Set up the vault</h3>
+        <p>
+          A master key is derived from your password in the browser and never transmitted. It
+          wraps a keypair generated on your device. You are shown a 32-byte recovery key once —
+          the only other way in.
+        </p>
+      </div>
+      <div class="col">
+        <div class="step-num">02</div>
+        <h3>Record what matters</h3>
+        <p>
+          Institution logins, account numbers, POA instructions, and PDF or DOCX attachments —
+          each encrypted client-side under your vault key before upload.
+        </p>
+      </div>
+      <div class="col">
+        <div class="step-num">03</div>
+        <h3>Name who gets in</h3>
+        <p>
+          Grant access to an executor, attorney, or spouse by email. Your vault key is re-wrapped
+          to their public key, and released to them only after they verify a one-time code.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-block split" id="cryptography">
+    <div class="split-intro">
+      <h6>What zero-knowledge means here</h6>
+      <h2>A subpoena to us produces base64 and nothing else.</h2>
+      <p>
+        Every secret is encrypted before it is sent. The server stores opaque blobs, a public
+        key, and a KDF salt. It has no derivation path to your plaintext.
+      </p>
+      <p class="text-muted">Expand any line for the exact construction.</p>
+    </div>
+    <div class="split-details">
+      <details open>
+        <summary>Your password derives a key, not a credential</summary>
+        <p>
+          PBKDF2-SHA256 over 600,000 iterations with a per-vault 16-byte salt produces a
+          non-extractable AES-256 master key. It exists only in memory, only long enough to
+          unwrap your private key, and is never sent anywhere.
+        </p>
+      </details>
+      <details open>
+        <summary>Items are sealed with authenticated encryption</summary>
+        <p>
+          Each item and each attachment is encrypted with AES-256-GCM under your vault key, with
+          a fresh 96-bit IV. A tampered blob fails its authentication tag rather than decrypting
+          to garbage.
+        </p>
+      </details>
+      <details open>
+        <summary>Sharing is post-quantum hybrid, not a link</summary>
+        <p>
+          To grant access, your vault key is wrapped in an envelope that combines RSA-OAEP-3072
+          with ML-KEM-768 through an HKDF-SHA256 combiner. Both must break for the envelope to
+          open — so traffic captured today is not readable by a future quantum attacker.
+        </p>
+      </details>
+      <details open>
+        <summary>Recovery is a key you hold, not a reset we perform</summary>
+        <p>
+          Setup generates 32 random bytes shown once as grouped hex. It wraps a second copy of
+          your private key. Support cannot substitute for it; print it and store it with the
+          will.
+        </p>
+      </details>
+      <details open class="last">
+        <summary>What we do see</summary>
+        <p>
+          Attachment file names, MIME types and sizes are stored in the clear so the format
+          allowlist can be enforced server-side. Item timestamps and the identities of people you
+          share with are also visible to us. We state this plainly rather than claim otherwise.
+        </p>
+      </details>
+    </div>
+  </section>
+
+  <section class="section-block" id="use-cases">
+    <h6>Two moments this is built for</h6>
+    <div class="col-2">
+      <div class="col">
+        <span class="tag tag-outline">While you are here</span>
+        <h3>Acting under power of attorney</h3>
+        <p>
+          An agent needs the bank portal, the brokerage login, the insurer's document upload —
+          often for years, often urgently. Grant a named holder access to exactly the vault they
+          need, see when it was granted, and revoke it without changing every password.
+        </p>
+        <table class="table">
+          <tbody>
+            <tr>
+              <td style="width: 45%">Bank &amp; brokerage logins</td>
+              <td class="text-muted">Encrypted fields</td>
+            </tr>
+            <tr>
+              <td>Executed POA (PDF)</td>
+              <td class="text-muted">Encrypted attachment</td>
+            </tr>
+            <tr>
+              <td>Access granted to agent</td>
+              <td><span class="tag tag-accent">Active</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col">
+        <span class="tag tag-outline">When you are gone</span>
+        <h3>Point-of-death paperwork</h3>
+        <p>
+          Executors lose weeks to closing accounts they cannot find. Keep the death-notification
+          checklist, account inventory, insurer claim forms and funeral directives in one vault,
+          and decide in advance who is entitled to open it.
+        </p>
+        <table class="table">
+          <tbody>
+            <tr>
+              <td style="width: 45%">Account inventory</td>
+              <td class="text-muted">Encrypted fields</td>
+            </tr>
+            <tr>
+              <td>Will &amp; trust documents</td>
+              <td class="text-muted">Encrypted attachment</td>
+            </tr>
+            <tr>
+              <td>Access for executor</td>
+              <td><span class="tag tag-neutral">Pending code</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="banner">
+    <h2>Nobody should have to guess their way through a parent's finances.</h2>
+    <p>AuthSystem is live and taking its first accounts. Read the construction, set up a vault, and tell us where it falls short.</p>
+    <div class="cta-row">
+      <a class="btn banner-btn-primary" href="#how-it-works">See how it works</a>
+      @if (authService.isAuthenticated()) {
+        <a class="btn banner-btn-secondary" routerLink="/vault/setup">Create a vault</a>
+      } @else {
+        <a class="btn banner-btn-secondary" routerLink="/register">Create a vault</a>
+      }
+    </div>
+  </section>
+
+  <footer class="landing-footer">
+    <span class="footer-brand">AuthSystem</span>
+    <a href="#cryptography">Cryptography notes</a>
+  </footer>
+</div>

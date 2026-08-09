@@ -1,39 +1,41 @@
-<mat-toolbar color="primary">
-  <span>AuthSystem</span>
-  <span class="spacer"></span>
-  <button
-    mat-icon-button
-    [matMenuTriggerFor]="themeMenu"
-    aria-label="Change color theme"
-    [matTooltip]="'Theme: ' + themeService.mode()"
-  >
-    <mat-icon>{{ themeIcons[themeService.mode()] }}</mat-icon>
-  </button>
-  <mat-menu #themeMenu="matMenu">
-    <button mat-menu-item (click)="setThemeMode('light')">
-      <mat-icon>light_mode</mat-icon>
-      <span>Light</span>
+@if (!isLandingPage()) {
+  <mat-toolbar>
+    <a routerLink="/" class="brand-link">AuthSystem</a>
+    <span class="spacer"></span>
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="themeMenu"
+      aria-label="Change color theme"
+      [matTooltip]="'Theme: ' + themeService.mode()"
+    >
+      <mat-icon>{{ themeIcons[themeService.mode()] }}</mat-icon>
     </button>
-    <button mat-menu-item (click)="setThemeMode('dark')">
-      <mat-icon>dark_mode</mat-icon>
-      <span>Dark</span>
-    </button>
-    <button mat-menu-item (click)="setThemeMode('system')">
-      <mat-icon>brightness_auto</mat-icon>
-      <span>System</span>
-    </button>
-  </mat-menu>
-  @if (authService.isAuthenticated()) {
-    <a mat-button routerLink="/vault">
-      <mat-icon>lock</mat-icon>
-      Vault
-    </a>
-    <span class="user-email">{{ authService.currentUser()?.email }}</span>
-    <button mat-button (click)="logout()">
-      <mat-icon>logout</mat-icon>
-      Logout
-    </button>
-  }
-</mat-toolbar>
+    <mat-menu #themeMenu="matMenu">
+      <button mat-menu-item (click)="setThemeMode('light')">
+        <mat-icon>light_mode</mat-icon>
+        <span>Light</span>
+      </button>
+      <button mat-menu-item (click)="setThemeMode('dark')">
+        <mat-icon>dark_mode</mat-icon>
+        <span>Dark</span>
+      </button>
+      <button mat-menu-item (click)="setThemeMode('system')">
+        <mat-icon>brightness_auto</mat-icon>
+        <span>System</span>
+      </button>
+    </mat-menu>
+    @if (authService.isAuthenticated()) {
+      <a mat-button routerLink="/vault">
+        <mat-icon>lock</mat-icon>
+        Vault
+      </a>
+      <span class="user-email">{{ authService.currentUser()?.email }}</span>
+      <button mat-button (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        Logout
+      </button>
+    }
+  </mat-toolbar>
+}
 
 <router-outlet />

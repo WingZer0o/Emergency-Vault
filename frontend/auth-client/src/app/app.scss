@@ -1,3 +1,18 @@
+// Flat, ink-on-surface toolbar with a strong divider instead of Material's default solid-fill
+// primary color and drop shadow, matching the Modernist nav treatment on the landing page.
+mat-toolbar {
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  border-bottom: 2px solid var(--mat-sys-outline-variant);
+  box-shadow: none;
+}
+
+.brand-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 800;
+}
+
 .spacer {
   flex: 1 1 auto;
 }

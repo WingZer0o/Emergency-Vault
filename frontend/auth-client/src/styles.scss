@@ -4,19 +4,39 @@
 // Learn more about theming and how to use it for your application's
 // custom components at https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
+@use 'app/styles/modernist';
 
 html {
   height: 100%;
   @include mat.theme(
     (
       color: (
-        primary: mat.$violet-palette,
-        tertiary: mat.$orange-palette,
+        // Modernist is a mono scheme (one accent, no second color) - use the same palette for
+        // both roles rather than a contrasting tertiary.
+        primary: mat.$red-palette,
+        tertiary: mat.$red-palette,
       ),
-      typography: Roboto,
+      typography: Archivo,
       density: 0,
     )
   );
+
+  // Modernist calls for zero corner radius everywhere ("nothing floats and nothing is
+  // decorated"). Material's shape system funnels every component's radius through these system
+  // variables, so overriding them here flattens buttons, fields, cards, menus and dialogs without
+  // touching each component individually.
+  --mat-sys-corner-none: 0px;
+  --mat-sys-corner-extra-small: 0px;
+  --mat-sys-corner-extra-small-top: 0px;
+  --mat-sys-corner-small: 0px;
+  --mat-sys-corner-medium: 0px;
+  --mat-sys-corner-large: 0px;
+  --mat-sys-corner-large-start: 0px;
+  --mat-sys-corner-large-end: 0px;
+  --mat-sys-corner-large-top: 0px;
+  --mat-sys-corner-extra-large: 0px;
+  --mat-sys-corner-extra-large-top: 0px;
+  --mat-sys-corner-full: 0px;
 }
 
 body {

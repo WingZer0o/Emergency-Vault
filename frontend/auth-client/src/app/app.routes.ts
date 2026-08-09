@@ -5,7 +5,11 @@ import { vaultSetupGuard } from './core/guards/vault-setup.guard';
 import { vaultUnlockedGuard } from './core/guards/vault-unlocked.guard';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+  {
+    path: '',
+    pathMatch: 'full',
+    loadComponent: () => import('./features/landing/landing').then((m) => m.Landing),
+  },
   {
     path: 'login',
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
