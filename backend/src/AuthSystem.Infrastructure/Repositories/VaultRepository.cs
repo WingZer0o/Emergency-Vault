@@ -117,6 +117,21 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
         db.VaultItemAttachments.Remove(attachment);
     }
 
+    public async Task AddItemViewsAsync(IEnumerable<VaultItemView> views, CancellationToken ct)
+    {
+        await db.VaultItemViews.AddRangeAsync(views, ct);
+    }
+
+    public async Task<IReadOnlyList<VaultItemView>> GetViewsForItemAsync(Guid vaultItemId, CancellationToken ct)
+    {
+        return await db.VaultItemViews
+            .Where(v => v.VaultItemId == vaultItemId)
+            .OrderByDescending(v => v.ViewedAt)
+            .Take(50)
+            .Include(v => v.Viewer)
+            .ToListAsync(ct);
+    }
+
     public async Task SaveChangesAsync(CancellationToken ct)
     {
         await db.SaveChangesAsync(ct);

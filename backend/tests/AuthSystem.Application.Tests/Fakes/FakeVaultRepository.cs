@@ -13,6 +13,7 @@ public class FakeVaultRepository : IVaultRepository
     public readonly List<VaultItem> Items = [];
     public readonly List<VaultKeyShare> Shares = [];
     public readonly List<VaultItemAttachment> Attachments = [];
+    public readonly List<VaultItemView> ItemViews = [];
 
     public Task<VaultProfile?> GetProfileAsync(Guid userId, CancellationToken ct) =>
         Task.FromResult(Profiles.FirstOrDefault(p => p.UserId == userId));
@@ -87,6 +88,16 @@ public class FakeVaultRepository : IVaultRepository
     }
 
     public void RemoveAttachment(VaultItemAttachment attachment) => Attachments.Remove(attachment);
+
+    public Task AddItemViewsAsync(IEnumerable<VaultItemView> views, CancellationToken ct)
+    {
+        ItemViews.AddRange(views);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<VaultItemView>> GetViewsForItemAsync(Guid vaultItemId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<VaultItemView>>(
+            ItemViews.Where(v => v.VaultItemId == vaultItemId).OrderByDescending(v => v.ViewedAt).Take(50).ToList());
 
     public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
 }

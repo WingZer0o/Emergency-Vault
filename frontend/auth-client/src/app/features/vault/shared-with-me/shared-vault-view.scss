@@ -13,13 +13,6 @@
   justify-content: space-between;
 }
 
-.field-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-}
-
 .verify-card {
   max-width: 420px;
   margin: 0 auto;
@@ -31,20 +24,6 @@
   }
 }
 
-.field-row-view {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  dt {
-    font-size: 12px;
-    color: var(--mat-sys-on-surface-variant);
-  }
-
-  dd {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
+.vault-item {
+  cursor: pointer;
 }

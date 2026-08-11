@@ -1,0 +1,84 @@
+<div class="vault-page">
+  <div class="vault-header">
+    <h1>{{ item()?.label || ownerName() || 'Shared item' }}</h1>
+    <a mat-button [routerLink]="['/vault/shared-with-me', ownerUserId]">Back</a>
+  </div>
+
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (challengeToken()) {
+    <mat-card class="verify-card">
+      <mat-card-header>
+        <mat-card-title>Enter verification code</mat-card-title>
+        <mat-card-subtitle>We emailed you a 6-digit code to view this shared vault.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="codeForm" (ngSubmit)="submitCode()">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Code</mat-label>
+            <input
+              matInput
+              type="text"
+              inputmode="numeric"
+              formControlName="code"
+              autocomplete="one-time-code"
+              maxlength="6"
+            />
+            @if (codeForm.controls.code.hasError('required')) {
+              <mat-error>Code is required.</mat-error>
+            } @else if (codeForm.controls.code.hasError('pattern')) {
+              <mat-error>Enter the 6-digit code.</mat-error>
+            }
+          </mat-form-field>
+
+          @if (codeError(); as message) {
+            <p class="error-text">{{ message }}</p>
+          }
+          @if (resendMessage(); as message) {
+            <p class="success-text">{{ message }}</p>
+          }
+
+          <div class="actions">
+            <a [routerLink]="['/vault/shared-with-me', ownerUserId]">Back</a>
+            <button mat-flat-button color="primary" type="submit" [disabled]="verifying()">
+              @if (verifying()) {
+                <mat-progress-spinner diameter="20" mode="indeterminate" />
+              } @else {
+                Verify
+              }
+            </button>
+          </div>
+        </form>
+
+        <p class="switch-link"><a (click)="resendCode()">Resend code</a></p>
+      </mat-card-content>
+    </mat-card>
+  } @else if (errorMessage(); as message) {
+    <p class="error-text">{{ message }}</p>
+  } @else if (item(); as currentItem) {
+    <mat-card class="item-card">
+      <mat-card-header>
+        <mat-card-title>{{ currentItem.label }}</mat-card-title>
+        <mat-card-subtitle>{{ currentItem.itemType }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <dl class="field-list">
+          @for (field of currentItem.fields; track field.name) {
+            <div class="field-row-view">
+              <dt>{{ field.name }}</dt>
+              <dd>
+                <span>{{ isRevealed(field.name) ? field.value : '••••••••' }}</span>
+                <button mat-icon-button type="button" (click)="toggleReveal(field.name)" aria-label="Toggle visibility">
+                  <mat-icon>{{ isRevealed(field.name) ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                <button mat-icon-button type="button" (click)="copyValue(field.value)" aria-label="Copy value">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </dd>
+            </div>
+          }
+        </dl>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

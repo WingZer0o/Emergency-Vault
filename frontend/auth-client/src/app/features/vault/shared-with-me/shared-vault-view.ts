@@ -5,9 +5,10 @@ import { firstValueFrom } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
@@ -16,6 +17,11 @@ import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 
+/**
+ * Lists the items in a shared vault so a holder can pick one to open. Listing itself is never
+ * logged as a "view" - only opening an individual item (SharedVaultItemDetail) is, since that's
+ * the point the owner would actually consider their data looked at.
+ */
 @Component({
   selector: 'app-shared-vault-view',
   imports: [
@@ -23,9 +29,10 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
     ReactiveFormsModule,
     MatCardModule,
     MatButtonModule,
-    MatIconModule,
+    MatDividerModule,
     MatFormFieldModule,
     MatInputModule,
+    MatListModule,
     MatProgressSpinnerModule,
   ],
   templateUrl: './shared-vault-view.html',
@@ -38,7 +45,7 @@ export class SharedVaultView implements OnInit {
   private readonly vaultService = inject(VaultService);
   private readonly vaultSession = inject(VaultSessionService);
 
-  private readonly ownerUserId = this.route.snapshot.paramMap.get('ownerUserId') ?? '';
+  readonly ownerUserId = this.route.snapshot.paramMap.get('ownerUserId') ?? '';
 
   /** Captured once the share is resolved, so it can be unwrapped after a pending code challenge is cleared. */
   private wrappedUvk: string | null = null;
@@ -47,7 +54,6 @@ export class SharedVaultView implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly ownerName = signal('');
   readonly items = signal<DecryptedVaultItem[]>([]);
-  readonly revealed = signal<ReadonlySet<string>>(new Set());
 
   /** Set once the backend says a fresh emailed code is required to view this vault this session. */
   readonly challengeToken = signal<string | null>(null);
@@ -127,24 +133,8 @@ export class SharedVaultView implements OnInit {
     });
   }
 
-  isRevealed(key: string): boolean {
-    return this.revealed().has(key);
-  }
-
-  toggleReveal(key: string): void {
-    this.revealed.update((current) => {
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }
-
-  async copyValue(value: string): Promise<void> {
-    await navigator.clipboard.writeText(value);
+  openItem(itemId: string): void {
+    this.router.navigateByUrl(`/vault/shared-with-me/${this.ownerUserId}/items/${itemId}`);
   }
 
   private async loadVaultContents(): Promise<void> {

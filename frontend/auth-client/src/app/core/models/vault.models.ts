@@ -145,3 +145,11 @@ export interface VaultItemAttachmentDto {
   iv: string;
   createdAt: string;
 }
+
+/** One event in a vault item's view history - a non-owner viewed it via the shared-vault flow. */
+export interface VaultItemViewDto {
+  viewerUserId: string;
+  viewerName: string;
+  viewerEmail: string;
+  viewedAt: string;
+}

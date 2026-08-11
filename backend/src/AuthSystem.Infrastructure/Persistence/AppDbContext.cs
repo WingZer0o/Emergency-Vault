@@ -14,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<VaultItem> VaultItems => Set<VaultItem>();
     public DbSet<VaultItemAttachment> VaultItemAttachments => Set<VaultItemAttachment>();
     public DbSet<VaultKeyShare> VaultKeyShares => Set<VaultKeyShare>();
+    public DbSet<VaultItemView> VaultItemViews => Set<VaultItemView>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -113,6 +114,25 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasOne(s => s.Holder)
                 .WithMany()
                 .HasForeignKey(s => s.HolderUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<VaultItemView>(e =>
+        {
+            e.ToTable("VaultItemViews");
+            e.HasKey(v => v.Id);
+            e.HasIndex(v => v.VaultItemId);
+            e.HasOne(v => v.VaultItem)
+                .WithMany()
+                .HasForeignKey(v => v.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Restrict, not Cascade: VaultItem already has a Cascade path into Users via Owner, so a
+            // second cascade path from this table into Users (via Viewer) would give SQL Server
+            // multiple cascade paths and the migration would fail to apply - same rationale as
+            // VaultKeyShare.Holder above.
+            e.HasOne(v => v.Viewer)
+                .WithMany()
+                .HasForeignKey(v => v.ViewerUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

@@ -84,6 +84,12 @@ export const routes: Routes = [
       import('./features/vault/shared-with-me/shared-vault-view').then((m) => m.SharedVaultView),
   },
   {
+    path: 'vault/shared-with-me/:ownerUserId/items/:itemId',
+    canActivate: [authGuard, vaultUnlockedGuard],
+    loadComponent: () =>
+      import('./features/vault/shared-with-me/shared-vault-item-detail').then((m) => m.SharedVaultItemDetail),
+  },
+  {
     path: 'vault',
     canActivate: [authGuard, vaultUnlockedGuard],
     loadComponent: () => import('./features/vault/item-list/vault-item-list').then((m) => m.VaultItemList),

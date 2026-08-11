@@ -56,6 +56,8 @@ public record VaultShareDto(Guid Id, Guid HolderUserId, string HolderName, strin
 
 public record VaultSharedWithMeDto(Guid Id, Guid OwnerUserId, string OwnerName, string OwnerEmail, string? WrappedUvk, DateTimeOffset GrantedAt, VaultShareStatus Status);
 
+public record VaultItemViewDto(Guid ViewerUserId, string ViewerName, string ViewerEmail, DateTimeOffset ViewedAt);
+
 public record VerifyVaultShareRequest([Required, StringLength(6, MinimumLength = 6)] string Code);
 
 public record SharedVaultAccessChallengeDto(bool RequiresCode, string? ChallengeToken);

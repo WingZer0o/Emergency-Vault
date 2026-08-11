@@ -29,5 +29,8 @@ public interface IVaultRepository
     Task AddAttachmentAsync(VaultItemAttachment attachment, CancellationToken ct);
     void RemoveAttachment(VaultItemAttachment attachment);
 
+    Task AddItemViewsAsync(IEnumerable<VaultItemView> views, CancellationToken ct);
+    Task<IReadOnlyList<VaultItemView>> GetViewsForItemAsync(Guid vaultItemId, CancellationToken ct);
+
     Task SaveChangesAsync(CancellationToken ct);
 }

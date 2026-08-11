@@ -1,0 +1,22 @@
+<h2 mat-dialog-title>Viewed by</h2>
+<mat-dialog-content>
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (errorMessage(); as message) {
+    <p class="error-text">{{ message }}</p>
+  } @else if (viewers().length === 0) {
+    <p>No one has viewed this item yet.</p>
+  } @else {
+    <mat-list>
+      @for (view of viewers(); track view.viewedAt + view.viewerUserId) {
+        <mat-list-item>
+          <span matListItemTitle>{{ view.viewerName }}</span>
+          <span matListItemLine>{{ view.viewerEmail }} &middot; {{ view.viewedAt | date: 'medium' }}</span>
+        </mat-list-item>
+      }
+    </mat-list>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+</mat-dialog-actions>

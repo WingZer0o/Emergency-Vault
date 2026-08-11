@@ -6,6 +6,7 @@ using AuthSystem.Application.Options;
 using AuthSystem.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AuthSystem.Application.Services;
@@ -18,7 +19,8 @@ public class VaultService(
     IEmailSender emailSender,
     ISharedVaultAccessChallengeCache sharedVaultAccessChallengeCache,
     ISharedVaultAccessGrantCache sharedVaultAccessGrantCache,
-    IOptions<VaultShareCodesOptions> vaultShareCodesOptions) : IVaultService
+    IOptions<VaultShareCodesOptions> vaultShareCodesOptions,
+    ILogger<VaultService> logger) : IVaultService
 {
     private readonly VaultShareCodesOptions _vaultShareCodesOptions = vaultShareCodesOptions.Value;
 
@@ -457,24 +459,88 @@ public class VaultService(
 
     public async Task<ServiceResult<IReadOnlyList<VaultItemDto>>> GetSharedItemsAsync(Guid holderUserId, Guid vaultOwnerUserId, CancellationToken ct)
     {
-        var share = await vaultRepository.GetActiveShareAsync(vaultOwnerUserId, holderUserId, ct);
-        if (share is null)
+        // Listing is not viewing - it only surfaces enough to render a clickable list (label/type
+        // still require decrypting the ciphertext client-side, but the server doesn't know that).
+        // Only GetSharedItemAsync, opening one specific item, is ever logged as a view.
+        var accessError = await CheckSharedVaultAccessAsync(holderUserId, vaultOwnerUserId, ct);
+        if (accessError is not null)
         {
-            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure("You don't have access to this vault.");
-        }
-
-        if (share.VerifiedAt is null)
-        {
-            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure("This shared vault hasn't been verified yet.");
-        }
-
-        if (holderUserId != vaultOwnerUserId && !await sharedVaultAccessGrantCache.HasValidGrantAsync(holderUserId, vaultOwnerUserId, ct))
-        {
-            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure("Enter the emailed code to view this vault.");
+            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure(accessError);
         }
 
         var items = await vaultRepository.GetItemsByOwnerAsync(vaultOwnerUserId, ct);
         return ServiceResult<IReadOnlyList<VaultItemDto>>.Success(items.Select(ToDto).ToList());
+    }
+
+    public async Task<ServiceResult<VaultItemDto>> GetSharedItemAsync(Guid holderUserId, Guid vaultOwnerUserId, Guid itemId, CancellationToken ct)
+    {
+        var accessError = await CheckSharedVaultAccessAsync(holderUserId, vaultOwnerUserId, ct);
+        if (accessError is not null)
+        {
+            return ServiceResult<VaultItemDto>.Failure(accessError);
+        }
+
+        var item = await vaultRepository.GetItemAsync(itemId, vaultOwnerUserId, ct);
+        if (item is null)
+        {
+            return ServiceResult<VaultItemDto>.Failure("Item not found.");
+        }
+
+        if (holderUserId != vaultOwnerUserId)
+        {
+            try
+            {
+                await vaultRepository.AddItemViewsAsync(
+                    [new VaultItemView { Id = Guid.NewGuid(), VaultItemId = item.Id, ViewerUserId = holderUserId, ViewedAt = DateTimeOffset.UtcNow }],
+                    ct);
+                await vaultRepository.SaveChangesAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                // Best-effort: a failure to write the audit log must never block a legitimate
+                // holder from seeing an item they're already authorized for.
+                logger.LogError(ex, "Failed to record a vault item view for holder {HolderUserId} on item {ItemId}", holderUserId, itemId);
+            }
+        }
+
+        return ServiceResult<VaultItemDto>.Success(ToDto(item));
+    }
+
+    /// <summary>Shared access checks common to GetSharedItemsAsync/GetSharedItemAsync. Returns a failure message, or null if access is allowed.</summary>
+    private async Task<string?> CheckSharedVaultAccessAsync(Guid holderUserId, Guid vaultOwnerUserId, CancellationToken ct)
+    {
+        var share = await vaultRepository.GetActiveShareAsync(vaultOwnerUserId, holderUserId, ct);
+        if (share is null)
+        {
+            return "You don't have access to this vault.";
+        }
+
+        if (share.VerifiedAt is null)
+        {
+            return "This shared vault hasn't been verified yet.";
+        }
+
+        if (holderUserId != vaultOwnerUserId && !await sharedVaultAccessGrantCache.HasValidGrantAsync(holderUserId, vaultOwnerUserId, ct))
+        {
+            return "Enter the emailed code to view this vault.";
+        }
+
+        return null;
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<VaultItemViewDto>>> GetItemViewersAsync(Guid ownerUserId, Guid itemId, CancellationToken ct)
+    {
+        var item = await vaultRepository.GetItemAsync(itemId, ownerUserId, ct);
+        if (item is null)
+        {
+            return ServiceResult<IReadOnlyList<VaultItemViewDto>>.Failure("Item not found.");
+        }
+
+        var views = await vaultRepository.GetViewsForItemAsync(itemId, ct);
+        var dtos = views
+            .Select(v => new VaultItemViewDto(v.ViewerUserId, $"{v.Viewer.FirstName} {v.Viewer.LastName}", v.Viewer.Email!, v.ViewedAt))
+            .ToList();
+        return ServiceResult<IReadOnlyList<VaultItemViewDto>>.Success(dtos);
     }
 
     public async Task<ServiceResult> VerifyShareAsync(Guid holderUserId, Guid shareId, string code, CancellationToken ct)

@@ -2,6 +2,8 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -10,11 +12,21 @@ import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
 import { DecryptedVaultItem, VaultItemPayload } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { ItemViewersDialog } from '../../../shared/item-viewers-dialog/item-viewers-dialog';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 
 @Component({
   selector: 'app-vault-item-list',
-  imports: [RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatListModule, MatProgressSpinnerModule],
+  imports: [
+    RouterLink,
+    MatCardModule,
+    MatButtonModule,
+    MatDialogModule,
+    MatDividerModule,
+    MatIconModule,
+    MatListModule,
+    MatProgressSpinnerModule,
+  ],
   templateUrl: './vault-item-list.html',
   styleUrl: './vault-item-list.scss',
 })
@@ -22,6 +34,7 @@ export class VaultItemList implements OnInit {
   private readonly vaultService = inject(VaultService);
   private readonly vaultSession = inject(VaultSessionService);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
 
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
@@ -41,6 +54,11 @@ export class VaultItemList implements OnInit {
 
   openItem(id: string): void {
     this.router.navigateByUrl(`/vault/items/${id}`);
+  }
+
+  viewViewers(itemId: string, event: Event): void {
+    event.stopPropagation();
+    this.dialog.open(ItemViewersDialog, { data: { itemId } });
   }
 
   private loadItems(): void {

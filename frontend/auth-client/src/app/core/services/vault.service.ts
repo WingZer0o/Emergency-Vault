@@ -11,6 +11,7 @@ import {
   UpdateVaultItemRequest,
   VaultItemAttachmentDto,
   VaultItemDto,
+  VaultItemViewDto,
   VaultRecoverRequest,
   VaultResetRecoveryBundleDto,
   VaultSetupRequest,
@@ -74,6 +75,10 @@ export class VaultService {
     return this.http.delete<void>(`${this.baseUrl}/items/${id}`);
   }
 
+  getItemViews(itemId: string): Observable<VaultItemViewDto[]> {
+    return this.http.get<VaultItemViewDto[]>(`${this.baseUrl}/items/${itemId}/views`);
+  }
+
   /** Uploads already-encrypted file bytes. Metadata rides in headers since the body is the raw
    * ciphertext (not JSON/multipart) - avoids base64 overhead on what's already binary. */
   uploadAttachment(
@@ -132,6 +137,11 @@ export class VaultService {
 
   getSharedItems(ownerUserId: string): Observable<VaultItemDto[]> {
     return this.http.get<VaultItemDto[]>(`${this.baseUrl}/shared-with-me/${ownerUserId}/items`);
+  }
+
+  /** Fetches one item from a shared vault - unlike getSharedItems, this is what gets logged as a view. */
+  getSharedItem(ownerUserId: string, itemId: string): Observable<VaultItemDto> {
+    return this.http.get<VaultItemDto>(`${this.baseUrl}/shared-with-me/${ownerUserId}/items/${itemId}`);
   }
 
   verifyShare(id: string, request: VerifyVaultShareRequest): Observable<{ message: string }> {

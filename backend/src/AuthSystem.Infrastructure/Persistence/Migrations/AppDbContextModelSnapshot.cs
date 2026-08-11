@@ -277,6 +277,30 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("VaultItemAttachments", (string)null);
                 });
 
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultItemView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("VaultItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ViewedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ViewerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VaultItemId");
+
+                    b.HasIndex("ViewerUserId");
+
+                    b.ToTable("VaultItemViews", (string)null);
+                });
+
             modelBuilder.Entity("AuthSystem.Domain.Entities.VaultKeyShare", b =>
                 {
                     b.Property<Guid>("Id")
@@ -528,6 +552,25 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("VaultItem");
+                });
+
+            modelBuilder.Entity("AuthSystem.Domain.Entities.VaultItemView", b =>
+                {
+                    b.HasOne("AuthSystem.Domain.Entities.VaultItem", "VaultItem")
+                        .WithMany()
+                        .HasForeignKey("VaultItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AuthSystem.Domain.Entities.ApplicationUser", "Viewer")
+                        .WithMany()
+                        .HasForeignKey("ViewerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("VaultItem");
+
+                    b.Navigation("Viewer");
                 });
 
             modelBuilder.Entity("AuthSystem.Domain.Entities.VaultKeyShare", b =>

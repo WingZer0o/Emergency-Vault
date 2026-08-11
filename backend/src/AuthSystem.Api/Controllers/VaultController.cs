@@ -97,6 +97,14 @@ public class VaultController(IVaultService vaultService) : ControllerBase
         return result.Succeeded ? NoContent() : NotFound(new { errors = result.Errors });
     }
 
+    [HttpGet("items/{id:guid}/views")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> GetItemViews(Guid id, CancellationToken ct)
+    {
+        var result = await vaultService.GetItemViewersAsync(User.GetUserId(), id, ct);
+        return result.Succeeded ? Ok(result.Data) : NotFound(new { errors = result.Errors });
+    }
+
     [HttpPost("items/{id:guid}/attachments")]
     [Authorize(Roles = "User")]
     [DisableRequestSizeLimit]
@@ -209,6 +217,14 @@ public class VaultController(IVaultService vaultService) : ControllerBase
     public async Task<IActionResult> SharedItems(Guid ownerUserId, CancellationToken ct)
     {
         var result = await vaultService.GetSharedItemsAsync(User.GetUserId(), ownerUserId, ct);
+        return result.Succeeded ? Ok(result.Data) : StatusCode(StatusCodes.Status403Forbidden, new { errors = result.Errors });
+    }
+
+    [HttpGet("shared-with-me/{ownerUserId:guid}/items/{itemId:guid}")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> SharedItem(Guid ownerUserId, Guid itemId, CancellationToken ct)
+    {
+        var result = await vaultService.GetSharedItemAsync(User.GetUserId(), ownerUserId, itemId, ct);
         return result.Succeeded ? Ok(result.Data) : StatusCode(StatusCodes.Status403Forbidden, new { errors = result.Errors });
     }
 
