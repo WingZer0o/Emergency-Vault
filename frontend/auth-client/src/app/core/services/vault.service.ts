@@ -11,6 +11,7 @@ import {
   UpdateVaultItemRequest,
   VaultItemAttachmentDto,
   VaultItemDto,
+  VaultItemShareDto,
   VaultItemViewDto,
   VaultRecoverRequest,
   VaultResetRecoveryBundleDto,
@@ -77,6 +78,16 @@ export class VaultService {
 
   getItemViews(itemId: string): Observable<VaultItemViewDto[]> {
     return this.http.get<VaultItemViewDto[]>(`${this.baseUrl}/items/${itemId}/views`);
+  }
+
+  /** Who this item is individually shared with (owner's view) - separate from getShares(), which is whole-vault only. */
+  getItemShares(itemId: string): Observable<VaultShareDto[]> {
+    return this.http.get<VaultShareDto[]>(`${this.baseUrl}/items/${itemId}/shares`);
+  }
+
+  /** Items shared with the current user individually - separate from getSharedWithMe(), which is whole-vault only. */
+  getItemSharesHeldByMe(): Observable<VaultItemShareDto[]> {
+    return this.http.get<VaultItemShareDto[]>(`${this.baseUrl}/item-shares/shared-with-me`);
   }
 
   /** Uploads already-encrypted file bytes. Metadata rides in headers since the body is the raw

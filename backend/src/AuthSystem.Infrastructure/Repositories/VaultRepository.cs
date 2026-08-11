@@ -17,10 +17,11 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
         await db.VaultProfiles.AddAsync(profile, ct);
     }
 
-    public async Task<VaultKeyShare?> GetActiveShareAsync(Guid vaultOwnerUserId, Guid holderUserId, CancellationToken ct)
+    public async Task<VaultKeyShare?> GetActiveShareAsync(Guid vaultOwnerUserId, Guid holderUserId, Guid? vaultItemId, CancellationToken ct)
     {
         return await db.VaultKeyShares.FirstOrDefaultAsync(
-            s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId == holderUserId && s.RevokedAt == null, ct);
+            s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId == holderUserId
+                && s.VaultItemId == vaultItemId && s.RevokedAt == null, ct);
     }
 
     public async Task<VaultKeyShare?> GetShareByIdAsync(Guid shareId, CancellationToken ct)
@@ -30,23 +31,49 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
 
     public async Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesGrantedByAsync(Guid vaultOwnerUserId, CancellationToken ct)
     {
+        // Whole-vault only ("Emergency access") - item-scoped shares are surfaced separately via
+        // GetActiveSharesForItemAsync, on the item's own detail page.
         return await db.VaultKeyShares
             .Include(s => s.Holder)
-            .Where(s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId != vaultOwnerUserId && s.RevokedAt == null)
+            .Where(s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId != vaultOwnerUserId
+                && s.VaultItemId == null && s.RevokedAt == null)
             .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesHeldByAsync(Guid holderUserId, CancellationToken ct)
     {
+        // Whole-vault only - item-scoped shares held by this user come from GetActiveItemSharesHeldByAsync.
         return await db.VaultKeyShares
             .Include(s => s.VaultOwner)
-            .Where(s => s.HolderUserId == holderUserId && s.VaultOwnerUserId != holderUserId && s.RevokedAt == null)
+            .Where(s => s.HolderUserId == holderUserId && s.VaultOwnerUserId != holderUserId
+                && s.VaultItemId == null && s.RevokedAt == null)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<VaultKeyShare>> GetActiveItemSharesHeldByAsync(Guid holderUserId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares
+            .Include(s => s.VaultOwner)
+            .Where(s => s.HolderUserId == holderUserId && s.VaultItemId != null && s.RevokedAt == null)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesForItemAsync(Guid vaultItemId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares
+            .Include(s => s.Holder)
+            .Where(s => s.VaultItemId == vaultItemId && s.RevokedAt == null)
             .ToListAsync(ct);
     }
 
     public async Task<int> DeleteHoldersSharesByIdAsync(Guid holderUserId, CancellationToken ct)
     {
         return await db.VaultKeyShares.Where(s => s.HolderUserId == holderUserId).ExecuteDeleteAsync(ct);
+    }
+
+    public async Task<int> DeleteItemSharesByItemIdAsync(Guid vaultItemId, CancellationToken ct)
+    {
+        return await db.VaultKeyShares.Where(s => s.VaultItemId == vaultItemId).ExecuteDeleteAsync(ct);
     }
 
     public async Task AddShareAsync(VaultKeyShare share, CancellationToken ct)

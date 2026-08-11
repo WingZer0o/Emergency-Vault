@@ -230,6 +230,9 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("WrappedItemKey")
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId");
@@ -307,6 +310,9 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("CanEdit")
+                        .HasColumnType("bit");
+
                     b.Property<DateTimeOffset>("GrantedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -315,6 +321,9 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("VaultItemId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("VaultOwnerUserId")
                         .HasColumnType("uniqueidentifier");
@@ -337,7 +346,7 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("VerifiedAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("WrappedUvk")
+                    b.Property<string>("WrappedKey")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -345,9 +354,17 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("HolderUserId");
 
+                    b.HasIndex("VaultItemId");
+
                     b.HasIndex("VaultOwnerUserId", "HolderUserId")
                         .IsUnique()
-                        .HasFilter("[RevokedAt] IS NULL");
+                        .HasDatabaseName("IX_VaultKeyShares_Owner_Holder_WholeVault")
+                        .HasFilter("[RevokedAt] IS NULL AND [VaultItemId] IS NULL");
+
+                    b.HasIndex("VaultOwnerUserId", "HolderUserId", "VaultItemId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_VaultKeyShares_Owner_Holder_Item")
+                        .HasFilter("[RevokedAt] IS NULL AND [VaultItemId] IS NOT NULL");
 
                     b.ToTable("VaultKeyShares", (string)null);
                 });
@@ -581,6 +598,11 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("AuthSystem.Domain.Entities.VaultItem", "VaultItem")
+                        .WithMany()
+                        .HasForeignKey("VaultItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("AuthSystem.Domain.Entities.ApplicationUser", "VaultOwner")
                         .WithMany()
                         .HasForeignKey("VaultOwnerUserId")
@@ -588,6 +610,8 @@ namespace AuthSystem.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Holder");
+
+                    b.Navigation("VaultItem");
 
                     b.Navigation("VaultOwner");
                 });

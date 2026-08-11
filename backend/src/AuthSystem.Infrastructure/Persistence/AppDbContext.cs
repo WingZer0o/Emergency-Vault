@@ -100,11 +100,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             e.ToTable("VaultKeyShares");
             e.HasKey(s => s.Id);
-            e.Property(s => s.WrappedUvk).IsRequired();
-            // At most one active grant per (owner, holder) pair, including the self-share row.
+            e.Property(s => s.WrappedKey).IsRequired();
+
+            // At most one active whole-vault share per pair (covers the self-share row too). A
+            // single index on the raw nullable VaultItemId column would NOT enforce this - SQL
+            // Server treats every NULL as distinct, so these two invariants need separate filtered
+            // indexes rather than one index over all three columns.
             e.HasIndex(s => new { s.VaultOwnerUserId, s.HolderUserId })
                 .IsUnique()
-                .HasFilter("[RevokedAt] IS NULL");
+                .HasFilter("[RevokedAt] IS NULL AND [VaultItemId] IS NULL")
+                .HasDatabaseName("IX_VaultKeyShares_Owner_Holder_WholeVault");
+            // At most one active share of a given item per pair. A holder may still separately hold
+            // both a whole-vault share and a redundant item-scoped share to the same owner.
+            e.HasIndex(s => new { s.VaultOwnerUserId, s.HolderUserId, s.VaultItemId })
+                .IsUnique()
+                .HasFilter("[RevokedAt] IS NULL AND [VaultItemId] IS NOT NULL")
+                .HasDatabaseName("IX_VaultKeyShares_Owner_Holder_Item");
+
             e.HasOne(s => s.VaultOwner)
                 .WithMany()
                 .HasForeignKey(s => s.VaultOwnerUserId)
@@ -114,6 +126,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasOne(s => s.Holder)
                 .WithMany()
                 .HasForeignKey(s => s.HolderUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Restrict, not Cascade: VaultItem already has a Cascade path into Users via Owner, so a
+            // second cascade path from this table into Users (via VaultItem) would hit the same
+            // multi-cascade-path problem as Holder above. Because share rows are only ever
+            // soft-revoked (never hard-deleted) elsewhere, VaultService.DeleteItemAsync must
+            // explicitly hard-delete an item's share rows before removing the item, or the item
+            // would become permanently undeletable once it had ever been shared.
+            e.HasOne(s => s.VaultItem)
+                .WithMany()
+                .HasForeignKey(s => s.VaultItemId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

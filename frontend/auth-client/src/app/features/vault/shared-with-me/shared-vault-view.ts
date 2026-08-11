@@ -143,7 +143,10 @@ export class SharedVaultView implements OnInit {
       const dtos = await firstValueFrom(this.vaultService.getSharedItems(this.ownerUserId));
       const decrypted = await Promise.all(
         dtos.map(async (dto) => {
-          const payload = await decryptItemPayload<VaultItemPayload>(uvk, dto.ciphertextBlob);
+          // Legacy items (not yet migrated to per-item keys) were encrypted directly with the
+          // UVK; a migrated item's payload is encrypted with its own key, wrapped under that same UVK.
+          const itemKey = dto.wrappedItemKey ? await this.vaultSession.unwrapItemKeyViaVaultShare(dto.wrappedItemKey, uvk) : uvk;
+          const payload = await decryptItemPayload<VaultItemPayload>(itemKey, dto.ciphertextBlob);
           return { ...payload, id: dto.id, createdAt: dto.createdAt, updatedAt: dto.updatedAt };
         }),
       );

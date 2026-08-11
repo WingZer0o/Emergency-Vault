@@ -11,7 +11,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
-import { DecryptedVaultItem, VaultItemPayload } from '../../../core/models/vault.models';
+import { DecryptedVaultItem, VaultItemDto, VaultItemPayload } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
@@ -48,6 +48,8 @@ export class SharedVaultItemDetail implements OnInit {
 
   /** Captured once the share is resolved, so it can be unwrapped after a pending code challenge is cleared. */
   private wrappedUvk: string | null = null;
+  /** Which kind of share granted access - determines how loadItem() resolves this item's key. */
+  private accessPath: 'whole-vault' | 'item-share' | null = null;
 
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
@@ -67,20 +69,36 @@ export class SharedVaultItemDetail implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
+      // Prefer a whole-vault share if the holder has one; otherwise fall back to an item-scoped
+      // share for this exact item. Only one of wrappedUvk/accessPath ends up set, depending on which.
       const shares = await firstValueFrom(this.vaultService.getSharedWithMe());
-      const share = shares.find((s) => s.ownerUserId === this.ownerUserId);
-      if (!share) {
-        this.errorMessage.set("You don't have access to this vault.");
-        this.loading.set(false);
-        return;
-      }
-      this.ownerName.set(share.ownerName);
+      const wholeVaultShare = shares.find((s) => s.ownerUserId === this.ownerUserId);
 
-      if (!share.wrappedUvk) {
-        this.router.navigateByUrl('/vault/shared-with-me');
-        return;
+      if (wholeVaultShare) {
+        this.ownerName.set(wholeVaultShare.ownerName);
+        if (!wholeVaultShare.wrappedUvk) {
+          // Not verified yet - the "Shared with me" list has the code-entry UI for this.
+          this.router.navigateByUrl('/vault/shared-with-me');
+          return;
+        }
+        this.accessPath = 'whole-vault';
+        this.wrappedUvk = wholeVaultShare.wrappedUvk;
+      } else {
+        const itemShares = await firstValueFrom(this.vaultService.getItemSharesHeldByMe());
+        const itemShare = itemShares.find((s) => s.ownerUserId === this.ownerUserId && s.itemId === this.itemId);
+        if (!itemShare) {
+          this.errorMessage.set("You don't have access to this item.");
+          this.loading.set(false);
+          return;
+        }
+        if (itemShare.status !== 'Active') {
+          // Not verified yet - same as above, the "Shared with me" list has the code-entry UI.
+          this.router.navigateByUrl('/vault/shared-with-me');
+          return;
+        }
+        this.ownerName.set(itemShare.ownerName);
+        this.accessPath = 'item-share';
       }
-      this.wrappedUvk = share.wrappedUvk;
 
       const challenge = await firstValueFrom(this.vaultService.requestSharedVaultAccess(this.ownerUserId));
       if (challenge.requiresCode && challenge.challengeToken) {
@@ -156,14 +174,27 @@ export class SharedVaultItemDetail implements OnInit {
 
   private async loadItem(): Promise<void> {
     try {
-      const uvk = await this.vaultSession.unwrapSharedUvk(this.wrappedUvk!);
       const dto = await firstValueFrom(this.vaultService.getSharedItem(this.ownerUserId, this.itemId));
-      const payload = await decryptItemPayload<VaultItemPayload>(uvk, dto.ciphertextBlob);
+      const itemKey = await this.resolveItemKey(dto);
+      const payload = await decryptItemPayload<VaultItemPayload>(itemKey, dto.ciphertextBlob);
       this.item.set({ ...payload, id: dto.id, createdAt: dto.createdAt, updatedAt: dto.updatedAt });
     } catch (err) {
       this.errorMessage.set(extractErrorMessage(err as HttpErrorResponse, 'Could not load this item.'));
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private async resolveItemKey(dto: VaultItemDto): Promise<CryptoKey> {
+    if (this.accessPath === 'item-share') {
+      // Always set here by construction - the server only populates itemShareWrappedKey when
+      // access came via an item-scoped share. Wrapped directly for this holder, no UVK involved.
+      return this.vaultSession.unwrapItemShareKey(dto.itemShareWrappedKey!);
+    }
+
+    // Whole-vault path: unwrap the vault's UVK, then (for a migrated item) this item's own key,
+    // wrapped under that same UVK - or use the UVK directly for a still-legacy item.
+    const uvk = await this.vaultSession.unwrapSharedUvk(this.wrappedUvk!);
+    return dto.wrappedItemKey ? this.vaultSession.unwrapItemKeyViaVaultShare(dto.wrappedItemKey, uvk) : uvk;
   }
 }

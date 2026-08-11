@@ -11,13 +11,17 @@ public interface IVaultRepository
     Task<VaultProfile?> GetProfileAsync(Guid userId, CancellationToken ct);
     Task AddProfileAsync(VaultProfile profile, CancellationToken ct);
 
-    Task<VaultKeyShare?> GetActiveShareAsync(Guid vaultOwnerUserId, Guid holderUserId, CancellationToken ct);
+    /// <summary>Pass vaultItemId: null for a whole-vault share, or a specific item's id for an item-scoped share.</summary>
+    Task<VaultKeyShare?> GetActiveShareAsync(Guid vaultOwnerUserId, Guid holderUserId, Guid? vaultItemId, CancellationToken ct);
     Task<VaultKeyShare?> GetShareByIdAsync(Guid shareId, CancellationToken ct);
     Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesGrantedByAsync(Guid vaultOwnerUserId, CancellationToken ct);
     Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesHeldByAsync(Guid holderUserId, CancellationToken ct);
+    Task<IReadOnlyList<VaultKeyShare>> GetActiveItemSharesHeldByAsync(Guid holderUserId, CancellationToken ct);
+    Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesForItemAsync(Guid vaultItemId, CancellationToken ct);
     Task AddShareAsync(VaultKeyShare share, CancellationToken ct);
     void RemoveShare(VaultKeyShare share);
     Task<int> DeleteHoldersSharesByIdAsync(Guid holderUserId, CancellationToken ct);
+    Task<int> DeleteItemSharesByItemIdAsync(Guid vaultItemId, CancellationToken ct);
     Task<IReadOnlyList<VaultItem>> GetItemsByOwnerAsync(Guid ownerUserId, CancellationToken ct);
     Task<VaultItem?> GetItemAsync(Guid itemId, Guid ownerUserId, CancellationToken ct);
     Task<VaultItem?> GetItemByIdAsync(Guid itemId, CancellationToken ct);

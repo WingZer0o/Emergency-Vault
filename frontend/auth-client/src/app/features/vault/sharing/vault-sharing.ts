@@ -67,8 +67,8 @@ export class VaultSharing implements OnInit {
       next: (lookup) => {
         importPublicKeySpki(lookup.publicKey)
           .then((publicKey) => wrapUvkForRecipient(this.vaultSession.uvk, publicKey, lookup.mlKemPublicKey))
-          .then((wrappedUvk) => {
-            this.vaultService.createShare({ holderEmail: email, wrappedUvk }).subscribe({
+          .then((wrappedKey) => {
+            this.vaultService.createShare({ holderEmail: email, wrappedKey, vaultItemId: null, canEdit: false }).subscribe({
               next: (share) => {
                 this.loading.set(false);
                 this.successMessage.set(

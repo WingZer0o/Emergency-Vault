@@ -11,7 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { encryptFileBytes, encryptItemPayload } from '../../../core/crypto/webcrypto.util';
+import { encryptFileBytes, encryptItemPayload, generateItemKey, wrapRawBytes } from '../../../core/crypto/webcrypto.util';
 import { VaultItemAttachmentDto, VaultItemPayload } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
@@ -108,12 +108,12 @@ export class VaultItemCreate {
     const raw = this.form.getRawValue();
     const payload: VaultItemPayload = { label: raw.label, itemType: raw.itemType, fields: raw.fields };
 
-    encryptItemPayload(this.vaultSession.uvk, payload)
-      .then((ciphertextBlob) => {
-        this.vaultService.createItem({ ciphertextBlob }).subscribe({
+    this.encryptForCreate(payload)
+      .then(({ ciphertextBlob, wrappedItemKey, itemKey }) => {
+        this.vaultService.createItem({ ciphertextBlob, wrappedItemKey }).subscribe({
           next: async (item) => {
             try {
-              await this.uploadStagedFiles(item.id);
+              await this.uploadStagedFiles(item.id, itemKey);
               this.router.navigateByUrl('/vault');
             } catch {
               this.loading.set(false);
@@ -133,11 +133,25 @@ export class VaultItemCreate {
       });
   }
 
-  private async uploadStagedFiles(itemId: string): Promise<void> {
+  /** Every item gets its own key (IK): the payload is encrypted with IK, and IK itself is wrapped
+   * under the owner's UVK so it can be recovered later - never encrypted directly with the UVK. */
+  private async encryptForCreate(
+    payload: VaultItemPayload,
+  ): Promise<{ ciphertextBlob: string; wrappedItemKey: string; itemKey: CryptoKey }> {
+    const itemKey = await generateItemKey();
+    const rawItemKey = new Uint8Array(await crypto.subtle.exportKey('raw', itemKey));
+    const [ciphertextBlob, wrappedItemKey] = await Promise.all([
+      encryptItemPayload(itemKey, payload),
+      wrapRawBytes(rawItemKey, this.vaultSession.uvk),
+    ]);
+    return { ciphertextBlob, wrappedItemKey, itemKey };
+  }
+
+  private async uploadStagedFiles(itemId: string, itemKey: CryptoKey): Promise<void> {
     for (const file of this.stagedFiles()) {
       this.uploadingLabel.set(file.name);
       const buffer = await file.arrayBuffer();
-      const { ivB64, ciphertext } = await encryptFileBytes(this.vaultSession.uvk, buffer);
+      const { ivB64, ciphertext } = await encryptFileBytes(itemKey, buffer);
       await firstValueFrom(
         this.vaultService
           .uploadAttachment(itemId, file.name, file.type, ivB64, file.size, ciphertext)

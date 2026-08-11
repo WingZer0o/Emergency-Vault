@@ -155,3 +155,9 @@ export async function unwrapUvkVersioned(
 
   return unwrapUvkHybrid(blob, holderRsaPrivateKey, holderMlKemSecretKey, extractable);
 }
+
+// wrapUvkForRecipient/unwrapUvkVersioned are already generic over any AES-256-GCM CryptoKey -
+// nothing about their implementation is UVK-specific, only the naming. These aliases give
+// per-item-key share call sites a clearer name without touching any existing UVK call site.
+export const wrapAesKeyForRecipient = wrapUvkForRecipient;
+export const unwrapAesKeyVersioned = unwrapUvkVersioned;

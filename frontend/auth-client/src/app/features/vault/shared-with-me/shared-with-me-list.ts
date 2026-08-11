@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { VaultShareStatus, VaultSharedWithMeDto } from '../../../core/models/vault.models';
+import { VaultItemShareDto, VaultShareStatus, VaultSharedWithMeDto } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 
@@ -35,8 +35,11 @@ export class SharedWithMeList implements OnInit {
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly shares = signal<VaultSharedWithMeDto[]>([]);
+  /** Items shared with the current user individually - separate from shares(), which is whole-vault only. */
+  readonly itemShares = signal<VaultItemShareDto[]>([]);
 
-  /** Which share's inline "enter code" form is currently open, if any. */
+  /** Which share's inline "enter code" form is currently open, if any - shareId is unique across
+   * both shares() and itemShares(), so one signal covers whichever list it came from. */
   readonly verifyingId = signal<string | null>(null);
   readonly verifying = signal(false);
   readonly verifyError = signal<string | null>(null);
@@ -48,6 +51,7 @@ export class SharedWithMeList implements OnInit {
 
   ngOnInit(): void {
     this.loadShares();
+    this.loadItemShares();
   }
 
   statusLabel(status: VaultShareStatus): string {
@@ -77,6 +81,20 @@ export class SharedWithMeList implements OnInit {
     this.codeForm.reset();
   }
 
+  onItemShareClick(share: VaultItemShareDto): void {
+    if (share.status === 'Active') {
+      this.router.navigateByUrl(`/vault/shared-with-me/${share.ownerUserId}/items/${share.itemId}`);
+      return;
+    }
+    if (share.status === 'Failed') {
+      return;
+    }
+    this.verifyingId.set(this.verifyingId() === share.shareId ? null : share.shareId);
+    this.verifyError.set(null);
+    this.resendMessage.set(null);
+    this.codeForm.reset();
+  }
+
   submitCode(shareId: string): void {
     if (this.codeForm.invalid) {
       this.codeForm.markAllAsTouched();
@@ -92,6 +110,7 @@ export class SharedWithMeList implements OnInit {
         this.verifying.set(false);
         this.verifyingId.set(null);
         this.loadShares();
+        this.loadItemShares();
       },
       error: (err) => {
         this.verifying.set(false);
@@ -120,6 +139,14 @@ export class SharedWithMeList implements OnInit {
         this.loading.set(false);
         this.errorMessage.set(extractErrorMessage(err, 'Could not load vaults shared with you.'));
       },
+    });
+  }
+
+  private loadItemShares(): void {
+    this.vaultService.getItemSharesHeldByMe().subscribe({
+      next: (shares) => this.itemShares.set(shares),
+      // Non-critical - whole-vault shares above still work if this list fails to load.
+      error: () => {},
     });
   }
 }

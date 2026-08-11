@@ -18,8 +18,21 @@ public class VaultKeyShare
     public Guid HolderUserId { get; set; }
     public ApplicationUser Holder { get; set; } = null!;
 
-    /// <summary>base64 RSA-OAEP ciphertext of the raw UVK, wrapped under the holder's public key. No IV - OAEP isn't IV-based.</summary>
-    public string WrappedUvk { get; set; } = string.Empty;
+    /// <summary>Null = whole-vault share (the original, and only, kind - including the self-share
+    /// row). Set = scoped to exactly one item, granted independently of any whole-vault share.</summary>
+    public Guid? VaultItemId { get; set; }
+    public VaultItem? VaultItem { get; set; }
+
+    /// <summary>Only meaningful when VaultItemId is set - a whole-vault holder already has
+    /// owner-equivalent read access via the UVK, and there is no whole-vault write capability.</summary>
+    public bool CanEdit { get; set; }
+
+    /// <summary>base64 ciphertext of the raw key this share grants, wrapped under the holder's
+    /// public key. Meaning depends on VaultItemId: null means this is the owner's whole UVK
+    /// (unchanged from the original design); set means this is that one item's own key (IK),
+    /// wrapped DIRECTLY for the holder - never via any UVK, so an item-scoped holder can never
+    /// touch any other item, even in principle.</summary>
+    public string WrappedKey { get; set; } = string.Empty;
 
     public DateTimeOffset GrantedAt { get; set; } = DateTimeOffset.UtcNow;
 

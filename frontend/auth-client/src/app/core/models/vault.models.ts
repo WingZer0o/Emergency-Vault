@@ -44,15 +44,24 @@ export interface VaultResetRecoveryBundleDto {
 
 export interface CreateVaultItemRequest {
   ciphertextBlob: string;
+  wrappedItemKey: string;
 }
 
 export interface UpdateVaultItemRequest {
   ciphertextBlob: string;
+  /** Only set once, by the owner, to backfill a legacy item onto per-item-key encryption. */
+  wrappedItemKey?: string;
 }
 
 export interface VaultItemDto {
   id: string;
   ciphertextBlob: string;
+  /** Null for a legacy item not yet migrated to per-item keys. This item's own key, wrapped under
+   * the OWNER's UVK - useless without that UVK, so it's safe on every response regardless of caller. */
+  wrappedItemKey: string | null;
+  /** Only set when the caller's access came via an item-scoped share: that share's own copy of
+   * this item's key, wrapped directly for the caller's public key. */
+  itemShareWrappedKey: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,7 +77,11 @@ export interface VaultUserLookupDto {
 
 export interface CreateVaultShareRequest {
   holderEmail: string;
-  wrappedUvk: string;
+  wrappedKey: string;
+  /** Null = whole-vault share. Set = scoped to just that one item. */
+  vaultItemId: string | null;
+  /** Ignored (forced false) server-side unless vaultItemId is set. */
+  canEdit: boolean;
 }
 
 /** Mirrors AuthSystem.Application.Dtos.VaultShareStatus - serialized as a string via JsonStringEnumConverter. */
@@ -79,6 +92,8 @@ export interface VaultShareDto {
   holderUserId: string;
   holderName: string;
   holderEmail: string;
+  vaultItemId: string | null;
+  canEdit: boolean;
   grantedAt: string;
   status: VaultShareStatus;
 }
@@ -90,6 +105,18 @@ export interface VaultSharedWithMeDto {
   ownerEmail: string;
   /** Null until the holder has verified the emailed code. */
   wrappedUvk: string | null;
+  grantedAt: string;
+  status: VaultShareStatus;
+}
+
+/** An item-scoped share held by the current user - the holder's-eye view of a single shared item. */
+export interface VaultItemShareDto {
+  shareId: string;
+  itemId: string;
+  ownerUserId: string;
+  ownerName: string;
+  ownerEmail: string;
+  canEdit: boolean;
   grantedAt: string;
   status: VaultShareStatus;
 }

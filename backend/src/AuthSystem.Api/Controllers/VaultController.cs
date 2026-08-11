@@ -105,6 +105,14 @@ public class VaultController(IVaultService vaultService) : ControllerBase
         return result.Succeeded ? Ok(result.Data) : NotFound(new { errors = result.Errors });
     }
 
+    [HttpGet("items/{id:guid}/shares")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> GetItemShares(Guid id, CancellationToken ct)
+    {
+        var result = await vaultService.GetItemSharesAsync(User.GetUserId(), id, ct);
+        return result.Succeeded ? Ok(result.Data) : NotFound(new { errors = result.Errors });
+    }
+
     [HttpPost("items/{id:guid}/attachments")]
     [Authorize(Roles = "User")]
     [DisableRequestSizeLimit]
@@ -209,6 +217,14 @@ public class VaultController(IVaultService vaultService) : ControllerBase
     public async Task<IActionResult> SharedWithMe(CancellationToken ct)
     {
         var result = await vaultService.GetSharedWithMeAsync(User.GetUserId(), ct);
+        return Ok(result.Data);
+    }
+
+    [HttpGet("item-shares/shared-with-me")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> ItemSharesSharedWithMe(CancellationToken ct)
+    {
+        var result = await vaultService.GetItemSharesHeldByAsync(User.GetUserId(), ct);
         return Ok(result.Data);
     }
 

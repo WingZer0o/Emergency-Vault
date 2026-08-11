@@ -2,6 +2,7 @@ import { Injectable, effect, inject, signal, computed } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import {
+  AES_ALGO,
   DEFAULT_KDF_ITERATIONS,
   deriveMasterKey,
   exportPublicKeySpki,
@@ -192,6 +193,27 @@ export class VaultSessionService {
     }
 
     return unwrapUvkVersioned(wrappedUvk, privateKey, this.mlKemSecretKeySig(), false);
+  }
+
+  /** Unwraps an item-scoped share's own key - wrapped directly for this holder's public key, never
+   * via any UVK, so a holder with only an item-scoped share never touches any other item. Same
+   * mechanism as unwrapSharedUvk, under a name that reads clearly at item-share call sites. */
+  async unwrapItemShareKey(wrappedKey: string): Promise<CryptoKey> {
+    return this.unwrapSharedUvk(wrappedKey);
+  }
+
+  /** Unwraps one of the current owner's own items' keys, via their own UVK. Extractable - the
+   * owner may need to re-wrap this same key for a new item-scoped share. */
+  async unwrapOwnedItemKey(wrappedItemKey: string): Promise<CryptoKey> {
+    const raw = await unwrapRawBytes(wrappedItemKey, this.uvk);
+    return crypto.subtle.importKey('raw', raw, AES_ALGO, true, ['encrypt', 'decrypt']);
+  }
+
+  /** Unwraps an item's key using an already-unwrapped whole-vault-share UVK (not the caller's own
+   * vault) - for a holder viewing an item via a whole-vault share. Non-extractable. */
+  async unwrapItemKeyViaVaultShare(wrappedItemKey: string, sharedUvk: CryptoKey): Promise<CryptoKey> {
+    const raw = await unwrapRawBytes(wrappedItemKey, sharedUvk);
+    return crypto.subtle.importKey('raw', raw, AES_ALGO, false, ['encrypt', 'decrypt']);
   }
 
   /** Locks the vault: clears in-memory key material and the persisted IndexedDB copy. Called on explicit logout and on idle timeout. */

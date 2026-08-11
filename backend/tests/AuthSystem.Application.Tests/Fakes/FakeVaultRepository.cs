@@ -24,21 +24,34 @@ public class FakeVaultRepository : IVaultRepository
         return Task.CompletedTask;
     }
 
-    public Task<VaultKeyShare?> GetActiveShareAsync(Guid vaultOwnerUserId, Guid holderUserId, CancellationToken ct) =>
+    public Task<VaultKeyShare?> GetActiveShareAsync(Guid vaultOwnerUserId, Guid holderUserId, Guid? vaultItemId, CancellationToken ct) =>
         Task.FromResult(Shares.FirstOrDefault(s =>
-            s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId == holderUserId && s.RevokedAt is null));
+            s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId == holderUserId
+                && s.VaultItemId == vaultItemId && s.RevokedAt is null));
 
     public Task<VaultKeyShare?> GetShareByIdAsync(Guid shareId, CancellationToken ct) =>
         Task.FromResult(Shares.FirstOrDefault(s => s.Id == shareId));
 
     public Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesGrantedByAsync(Guid vaultOwnerUserId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<VaultKeyShare>>(Shares
-            .Where(s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId != vaultOwnerUserId && s.RevokedAt is null)
+            .Where(s => s.VaultOwnerUserId == vaultOwnerUserId && s.HolderUserId != vaultOwnerUserId
+                && s.VaultItemId == null && s.RevokedAt is null)
             .ToList());
 
     public Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesHeldByAsync(Guid holderUserId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<VaultKeyShare>>(Shares
-            .Where(s => s.HolderUserId == holderUserId && s.VaultOwnerUserId != holderUserId && s.RevokedAt is null)
+            .Where(s => s.HolderUserId == holderUserId && s.VaultOwnerUserId != holderUserId
+                && s.VaultItemId == null && s.RevokedAt is null)
+            .ToList());
+
+    public Task<IReadOnlyList<VaultKeyShare>> GetActiveItemSharesHeldByAsync(Guid holderUserId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<VaultKeyShare>>(Shares
+            .Where(s => s.HolderUserId == holderUserId && s.VaultItemId != null && s.RevokedAt is null)
+            .ToList());
+
+    public Task<IReadOnlyList<VaultKeyShare>> GetActiveSharesForItemAsync(Guid vaultItemId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<VaultKeyShare>>(Shares
+            .Where(s => s.VaultItemId == vaultItemId && s.RevokedAt is null)
             .ToList());
 
     public Task<IReadOnlyList<VaultKeyShare>> GetSharesHeldByAsync(Guid holderUserId, CancellationToken ct) =>
@@ -55,6 +68,12 @@ public class FakeVaultRepository : IVaultRepository
     public Task<int> DeleteHoldersSharesByIdAsync(Guid holderUserId, CancellationToken ct)
     {
         var removed = Shares.RemoveAll(s => s.HolderUserId == holderUserId);
+        return Task.FromResult(removed);
+    }
+
+    public Task<int> DeleteItemSharesByItemIdAsync(Guid vaultItemId, CancellationToken ct)
+    {
+        var removed = Shares.RemoveAll(s => s.VaultItemId == vaultItemId);
         return Task.FromResult(removed);
     }
 

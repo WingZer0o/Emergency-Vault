@@ -71,8 +71,42 @@
           }
         </div>
 
+        <div class="item-shares">
+          <h3>Shared with</h3>
+
+          @if (itemShares().length === 0) {
+            <p class="hint-text">Not shared with anyone individually.</p>
+          } @else {
+            <mat-list>
+              @for (share of itemShares(); track share.id) {
+                <mat-list-item>
+                  <span matListItemTitle>{{ share.holderName }}</span>
+                  <span matListItemLine>{{ share.holderEmail }} &middot; {{ share.canEdit ? 'Can edit' : 'View only' }}</span>
+                  <button mat-icon-button matListItemMeta (click)="revokeItemShare(share.id)" aria-label="Revoke access">
+                    <mat-icon>person_remove</mat-icon>
+                  </button>
+                </mat-list-item>
+              }
+            </mat-list>
+          }
+
+          <button mat-stroked-button type="button" [disabled]="sharingItem()" (click)="shareItem()">
+            @if (sharingItem()) {
+              <mat-progress-spinner diameter="20" mode="indeterminate" />
+            } @else {
+              <ng-container>
+                <mat-icon>person_add</mat-icon>
+                Share this item
+              </ng-container>
+            }
+          </button>
+        </div>
+
         @if (errorMessage(); as message) {
           <p class="error-text">{{ message }}</p>
+        }
+        @if (successMessage(); as message) {
+          <p class="success-text">{{ message }}</p>
         }
 
         <div class="actions">

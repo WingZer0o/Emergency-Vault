@@ -26,6 +26,8 @@ public interface IVaultService
     Task<ServiceResult<VaultUserLookupDto>> LookupUserAsync(string email, CancellationToken ct);
     Task<ServiceResult<VaultShareDto>> CreateShareAsync(Guid ownerUserId, CreateVaultShareRequest request, CancellationToken ct);
     Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetSharesAsync(Guid ownerUserId, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetItemSharesAsync(Guid ownerUserId, Guid itemId, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultItemShareDto>>> GetItemSharesHeldByAsync(Guid holderUserId, CancellationToken ct);
     Task<ServiceResult> RevokeShareAsync(Guid ownerUserId, Guid shareId, CancellationToken ct);
     Task<ServiceResult<IReadOnlyList<VaultSharedWithMeDto>>> GetSharedWithMeAsync(Guid holderUserId, CancellationToken ct);
     Task<ServiceResult<IReadOnlyList<VaultItemDto>>> GetSharedItemsAsync(Guid holderUserId, Guid vaultOwnerUserId, CancellationToken ct);

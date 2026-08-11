@@ -84,6 +84,10 @@ export async function generateUvk(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: AES_ALGO, length: 256 }, true, ['encrypt', 'decrypt']);
 }
 
+/** Generates a per-item AES-256-GCM key. Same shape as generateUvk (any AES-GCM key works the same
+ * way here) - a distinct name just for readability at per-item-key call sites. */
+export const generateItemKey = generateUvk;
+
 export async function wrapPrivateKey(privateKey: CryptoKey, wrappingKey: CryptoKey): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
   const wrapped = await crypto.subtle.wrapKey('pkcs8', privateKey, wrappingKey, { name: AES_ALGO, iv });

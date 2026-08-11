@@ -66,7 +66,7 @@ public class VaultService(
             Id = Guid.NewGuid(),
             VaultOwnerUserId = userId,
             HolderUserId = userId,
-            WrappedUvk = request.SelfWrappedUvk,
+            WrappedKey = request.SelfWrappedUvk,
             // Self-share never goes through the emailed-code flow - it's usable immediately.
             VerifiedAt = DateTimeOffset.UtcNow,
         }, ct);
@@ -93,7 +93,7 @@ public class VaultService(
     public async Task<ServiceResult<VaultUnlockBundleDto>> GetUnlockBundleAsync(Guid userId, CancellationToken ct)
     {
         var profile = await vaultRepository.GetProfileAsync(userId, ct);
-        var selfShare = profile == null ? null : await vaultRepository.GetActiveShareAsync(userId, userId, ct);
+        var selfShare = profile == null ? null : await vaultRepository.GetActiveShareAsync(userId, userId, null, ct);
         if (profile is null || selfShare is null)
         {
             return ServiceResult<VaultUnlockBundleDto>.Failure("Vault has not been set up.");
@@ -104,7 +104,7 @@ public class VaultService(
             profile.KdfIterations,
             profile.PrivateKeyWrappedByMasterKey,
             profile.PrivateKeyWrappedByRecoveryKey,
-            selfShare.WrappedUvk,
+            selfShare.WrappedKey,
             profile.MlKemPublicKey,
             profile.MlKemSecretKeyWrappedByMasterKey,
             profile.MlKemSecretKeyWrappedByRecoveryKey));
@@ -175,6 +175,7 @@ public class VaultService(
             Id = Guid.NewGuid(),
             OwnerUserId = ownerUserId,
             CiphertextBlob = request.CiphertextBlob,
+            WrappedItemKey = request.WrappedItemKey,
         };
         await vaultRepository.AddItemAsync(item, ct);
         await vaultRepository.SaveChangesAsync(ct);
@@ -185,7 +186,7 @@ public class VaultService(
     public async Task<ServiceResult<IReadOnlyList<VaultItemDto>>> GetItemsAsync(Guid ownerUserId, CancellationToken ct)
     {
         var items = await vaultRepository.GetItemsByOwnerAsync(ownerUserId, ct);
-        return ServiceResult<IReadOnlyList<VaultItemDto>>.Success(items.Select(ToDto).ToList());
+        return ServiceResult<IReadOnlyList<VaultItemDto>>.Success(items.Select(i => ToDto(i)).ToList());
     }
 
     public async Task<ServiceResult<VaultItemDto>> GetItemAsync(Guid ownerUserId, Guid itemId, CancellationToken ct)
@@ -196,12 +197,20 @@ public class VaultService(
             : ServiceResult<VaultItemDto>.Success(ToDto(item));
     }
 
-    public async Task<ServiceResult<VaultItemDto>> UpdateItemAsync(Guid ownerUserId, Guid itemId, UpdateVaultItemRequest request, CancellationToken ct)
+    public async Task<ServiceResult<VaultItemDto>> UpdateItemAsync(Guid callerId, Guid itemId, UpdateVaultItemRequest request, CancellationToken ct)
     {
-        var item = await vaultRepository.GetItemAsync(itemId, ownerUserId, ct);
-        if (item is null)
+        var item = await vaultRepository.GetItemByIdAsync(itemId, ct);
+        if (item is null || !await CanWriteItemAsync(callerId, item, ct))
         {
+            // Generic failure either way - never confirm an item's existence to a non-holder.
             return ServiceResult<VaultItemDto>.Failure("Item not found.");
+        }
+
+        // Only the owner's own edit can backfill this item onto per-item-key encryption, and only
+        // once - a CanEdit share holder never sends a WrappedItemKey (they never migrate items).
+        if (callerId == item.OwnerUserId && request.WrappedItemKey is not null && item.WrappedItemKey is null)
+        {
+            item.WrappedItemKey = request.WrappedItemKey;
         }
 
         item.CiphertextBlob = request.CiphertextBlob;
@@ -219,6 +228,10 @@ public class VaultService(
             return ServiceResult.Failure("Item not found.");
         }
 
+        // Share rows are only ever soft-revoked elsewhere, and the FK from VaultKeyShare.VaultItemId
+        // is Restrict (not Cascade - see AppDbContext) - without this, an item that had ever been
+        // shared would become permanently undeletable.
+        await vaultRepository.DeleteItemSharesByItemIdAsync(itemId, ct);
         vaultRepository.RemoveItem(item);
         await vaultRepository.SaveChangesAsync(ct);
         return ServiceResult.Success();
@@ -227,10 +240,8 @@ public class VaultService(
     public async Task<ServiceResult<VaultItemAttachmentDto>> UploadAttachmentAsync(
         Guid callerId, Guid itemId, string fileName, string contentType, string ivBase64, long sizeBytes, Stream content, CancellationToken ct)
     {
-        // Write access is owner-only, matching UpdateItemAsync/DeleteItemAsync - there is no
-        // shared-holder write path anywhere in the vault today.
-        var item = await vaultRepository.GetItemAsync(itemId, callerId, ct);
-        if (item is null)
+        var item = await vaultRepository.GetItemByIdAsync(itemId, ct);
+        if (item is null || !await CanWriteItemAsync(callerId, item, ct))
         {
             return ServiceResult<VaultItemAttachmentDto>.Failure("Item not found.");
         }
@@ -277,7 +288,7 @@ public class VaultService(
     public async Task<ServiceResult<IReadOnlyList<VaultItemAttachmentDto>>> GetAttachmentsAsync(Guid callerId, Guid itemId, CancellationToken ct)
     {
         var item = await vaultRepository.GetItemByIdAsync(itemId, ct);
-        if (item is null || !await CanAccessItemAsync(callerId, item.OwnerUserId, ct))
+        if (item is null || !await CanAccessItemAsync(callerId, item, ct))
         {
             return ServiceResult<IReadOnlyList<VaultItemAttachmentDto>>.Failure("Item not found.");
         }
@@ -290,7 +301,7 @@ public class VaultService(
         Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct)
     {
         var item = await vaultRepository.GetItemByIdAsync(itemId, ct);
-        if (item is null || !await CanAccessItemAsync(callerId, item.OwnerUserId, ct))
+        if (item is null || !await CanAccessItemAsync(callerId, item, ct))
         {
             return ServiceResult<(VaultItemAttachmentDto Meta, Stream Content)>.Failure("Item not found.");
         }
@@ -307,9 +318,8 @@ public class VaultService(
 
     public async Task<ServiceResult> DeleteAttachmentAsync(Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct)
     {
-        // Write access is owner-only - same rationale as UploadAttachmentAsync.
-        var item = await vaultRepository.GetItemAsync(itemId, callerId, ct);
-        if (item is null)
+        var item = await vaultRepository.GetItemByIdAsync(itemId, ct);
+        if (item is null || !await CanWriteItemAsync(callerId, item, ct))
         {
             return ServiceResult.Failure("Item not found.");
         }
@@ -325,21 +335,33 @@ public class VaultService(
         return ServiceResult.Success();
     }
 
-    /// <summary>Owner-or-verified-share read-access check, mirroring the inline logic in GetSharedItemsAsync.</summary>
-    private async Task<bool> CanAccessItemAsync(Guid callerId, Guid ownerUserId, CancellationToken ct)
+    /// <summary>Owner-or-verified-share read-access check (whole-vault or scoped to this specific item).</summary>
+    private async Task<bool> CanAccessItemAsync(Guid callerId, VaultItem item, CancellationToken ct)
     {
-        if (callerId == ownerUserId)
+        if (callerId == item.OwnerUserId)
         {
             return true;
         }
 
-        var share = await vaultRepository.GetActiveShareAsync(ownerUserId, callerId, ct);
-        if (share is null || share.VerifiedAt is null)
+        var (error, _) = await CheckSharedVaultAccessAsync(callerId, item.OwnerUserId, item.Id, ct);
+        return error is null;
+    }
+
+    /// <summary>Write access: owner, or a holder with an active+verified+CanEdit share scoped to this item.</summary>
+    private async Task<bool> CanWriteItemAsync(Guid callerId, VaultItem item, CancellationToken ct)
+    {
+        if (callerId == item.OwnerUserId)
+        {
+            return true;
+        }
+
+        var share = await vaultRepository.GetActiveShareAsync(item.OwnerUserId, callerId, item.Id, ct);
+        if (share is not { VerifiedAt: not null, CanEdit: true })
         {
             return false;
         }
 
-        return await sharedVaultAccessGrantCache.HasValidGrantAsync(callerId, ownerUserId, ct);
+        return await sharedVaultAccessGrantCache.HasValidGrantAsync(callerId, item.OwnerUserId, ct);
     }
 
     private static VaultItemAttachmentDto ToAttachmentDto(VaultItemAttachment a) =>
@@ -383,7 +405,23 @@ public class VaultService(
             return ServiceResult<VaultShareDto>.Failure("No user found with that email, or they haven't set up their vault yet.");
         }
 
-        var existing = await vaultRepository.GetActiveShareAsync(ownerUserId, holder.Id, ct);
+        if (request.VaultItemId is { } itemId)
+        {
+            var item = await vaultRepository.GetItemAsync(itemId, ownerUserId, ct);
+            if (item is null)
+            {
+                return ServiceResult<VaultShareDto>.Failure("Item not found.");
+            }
+
+            if (item.WrappedItemKey is null)
+            {
+                // The frontend is responsible for migrating an item onto per-item-key encryption
+                // before offering to share it individually - this is a defensive backstop only.
+                return ServiceResult<VaultShareDto>.Failure("Open this item once before sharing it individually.");
+            }
+        }
+
+        var existing = await vaultRepository.GetActiveShareAsync(ownerUserId, holder.Id, request.VaultItemId, ct);
         if (existing is { } existingShare)
         {
             existingShare.RevokedAt = DateTimeOffset.UtcNow;
@@ -400,7 +438,10 @@ public class VaultService(
             VaultOwner = owner,
             HolderUserId = holder.Id,
             Holder = holder,
-            WrappedUvk = request.WrappedUvk,
+            VaultItemId = request.VaultItemId,
+            // Force false for a whole-vault share - CanEdit only ever applies to an item-scoped one.
+            CanEdit = request.VaultItemId is not null && request.CanEdit,
+            WrappedKey = request.WrappedKey,
             VerificationSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(20)),
             VerificationCounter = 1,
             VerificationCodeExpiresAt = now + _vaultShareCodesOptions.CodeExpiration,
@@ -414,16 +455,44 @@ public class VaultService(
         await emailSender.SendVaultShareCodeAsync(holder.Email!, code, $"{owner.FirstName} {owner.LastName}", ct);
 
         return ServiceResult<VaultShareDto>.Success(
-            new VaultShareDto(share.Id, holder.Id, $"{holder.FirstName} {holder.LastName}", holder.Email!, share.GrantedAt, ComputeStatus(share)));
+            new VaultShareDto(share.Id, holder.Id, $"{holder.FirstName} {holder.LastName}", holder.Email!, share.VaultItemId, share.CanEdit, share.GrantedAt, ComputeStatus(share)));
     }
 
     public async Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetSharesAsync(Guid ownerUserId, CancellationToken ct)
     {
+        // Whole-vault shares only - item-scoped shares are shown on the item's own detail page
+        // instead (GetItemSharesAsync), so this "Emergency access" list doesn't get cluttered.
         var shares = await vaultRepository.GetActiveSharesGrantedByAsync(ownerUserId, ct);
         var dtos = shares
-            .Select(s => new VaultShareDto(s.Id, s.HolderUserId, $"{s.Holder.FirstName} {s.Holder.LastName}", s.Holder.Email!, s.GrantedAt, ComputeStatus(s)))
+            .Select(s => new VaultShareDto(s.Id, s.HolderUserId, $"{s.Holder.FirstName} {s.Holder.LastName}", s.Holder.Email!, s.VaultItemId, s.CanEdit, s.GrantedAt, ComputeStatus(s)))
             .ToList();
         return ServiceResult<IReadOnlyList<VaultShareDto>>.Success(dtos);
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetItemSharesAsync(Guid ownerUserId, Guid itemId, CancellationToken ct)
+    {
+        var item = await vaultRepository.GetItemAsync(itemId, ownerUserId, ct);
+        if (item is null)
+        {
+            return ServiceResult<IReadOnlyList<VaultShareDto>>.Failure("Item not found.");
+        }
+
+        var shares = await vaultRepository.GetActiveSharesForItemAsync(itemId, ct);
+        var dtos = shares
+            .Select(s => new VaultShareDto(s.Id, s.HolderUserId, $"{s.Holder.FirstName} {s.Holder.LastName}", s.Holder.Email!, s.VaultItemId, s.CanEdit, s.GrantedAt, ComputeStatus(s)))
+            .ToList();
+        return ServiceResult<IReadOnlyList<VaultShareDto>>.Success(dtos);
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<VaultItemShareDto>>> GetItemSharesHeldByAsync(Guid holderUserId, CancellationToken ct)
+    {
+        var shares = await vaultRepository.GetActiveItemSharesHeldByAsync(holderUserId, ct);
+        var dtos = shares
+            .Select(s => new VaultItemShareDto(
+                s.Id, s.VaultItemId!.Value, s.VaultOwnerUserId, $"{s.VaultOwner.FirstName} {s.VaultOwner.LastName}", s.VaultOwner.Email!,
+                s.CanEdit, s.GrantedAt, ComputeStatus(s)))
+            .ToList();
+        return ServiceResult<IReadOnlyList<VaultItemShareDto>>.Success(dtos);
     }
 
     public async Task<ServiceResult> RevokeShareAsync(Guid ownerUserId, Guid shareId, CancellationToken ct)
@@ -452,7 +521,7 @@ public class VaultService(
         var dtos = shares
             .Select(s => new VaultSharedWithMeDto(
                 s.Id, s.VaultOwnerUserId, $"{s.VaultOwner.FirstName} {s.VaultOwner.LastName}", s.VaultOwner.Email!,
-                s.VerifiedAt is not null ? s.WrappedUvk : null, s.GrantedAt, ComputeStatus(s)))
+                s.VerifiedAt is not null ? s.WrappedKey : null, s.GrantedAt, ComputeStatus(s)))
             .ToList();
         return ServiceResult<IReadOnlyList<VaultSharedWithMeDto>>.Success(dtos);
     }
@@ -462,22 +531,24 @@ public class VaultService(
         // Listing is not viewing - it only surfaces enough to render a clickable list (label/type
         // still require decrypting the ciphertext client-side, but the server doesn't know that).
         // Only GetSharedItemAsync, opening one specific item, is ever logged as a view.
-        var accessError = await CheckSharedVaultAccessAsync(holderUserId, vaultOwnerUserId, ct);
-        if (accessError is not null)
+        // Deliberately whole-vault-only (itemId: null) - an item-scoped-only holder must never be
+        // able to learn the existence/count of an owner's other items via this endpoint.
+        var (error, _) = await CheckSharedVaultAccessAsync(holderUserId, vaultOwnerUserId, null, ct);
+        if (error is not null)
         {
-            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure(accessError);
+            return ServiceResult<IReadOnlyList<VaultItemDto>>.Failure(error);
         }
 
         var items = await vaultRepository.GetItemsByOwnerAsync(vaultOwnerUserId, ct);
-        return ServiceResult<IReadOnlyList<VaultItemDto>>.Success(items.Select(ToDto).ToList());
+        return ServiceResult<IReadOnlyList<VaultItemDto>>.Success(items.Select(i => ToDto(i)).ToList());
     }
 
     public async Task<ServiceResult<VaultItemDto>> GetSharedItemAsync(Guid holderUserId, Guid vaultOwnerUserId, Guid itemId, CancellationToken ct)
     {
-        var accessError = await CheckSharedVaultAccessAsync(holderUserId, vaultOwnerUserId, ct);
-        if (accessError is not null)
+        var (error, matchedShare) = await CheckSharedVaultAccessAsync(holderUserId, vaultOwnerUserId, itemId, ct);
+        if (error is not null)
         {
-            return ServiceResult<VaultItemDto>.Failure(accessError);
+            return ServiceResult<VaultItemDto>.Failure(error);
         }
 
         var item = await vaultRepository.GetItemAsync(itemId, vaultOwnerUserId, ct);
@@ -503,29 +574,39 @@ public class VaultService(
             }
         }
 
-        return ServiceResult<VaultItemDto>.Success(ToDto(item));
+        // Only populated when access came via an item-scoped share (not a whole-vault one) -
+        // that share's own copy of this item's key, wrapped directly for this caller.
+        var itemShareWrappedKey = matchedShare is { VaultItemId: not null } ? matchedShare.WrappedKey : null;
+        return ServiceResult<VaultItemDto>.Success(ToDto(item, itemShareWrappedKey));
     }
 
-    /// <summary>Shared access checks common to GetSharedItemsAsync/GetSharedItemAsync. Returns a failure message, or null if access is allowed.</summary>
-    private async Task<string?> CheckSharedVaultAccessAsync(Guid holderUserId, Guid vaultOwnerUserId, CancellationToken ct)
+    /// <summary>
+    /// Shared access checks common to GetSharedItemsAsync/GetSharedItemAsync/CanAccessItemAsync.
+    /// Checks both a whole-vault share and (if itemId given) an item-scoped share for that item,
+    /// preferring whichever is actually verified - an unverified whole-vault share must not mask
+    /// a verified item-scoped one. Returns a failure message, or the matched share on success.
+    /// </summary>
+    private async Task<(string? Error, VaultKeyShare? Share)> CheckSharedVaultAccessAsync(Guid holderUserId, Guid vaultOwnerUserId, Guid? itemId, CancellationToken ct)
     {
-        var share = await vaultRepository.GetActiveShareAsync(vaultOwnerUserId, holderUserId, ct);
+        var wholeVaultShare = await vaultRepository.GetActiveShareAsync(vaultOwnerUserId, holderUserId, null, ct);
+        var itemShare = itemId is null ? null : await vaultRepository.GetActiveShareAsync(vaultOwnerUserId, holderUserId, itemId, ct);
+
+        var share = (wholeVaultShare?.VerifiedAt is not null ? wholeVaultShare : null)
+            ?? (itemShare?.VerifiedAt is not null ? itemShare : null);
+
         if (share is null)
         {
-            return "You don't have access to this vault.";
-        }
-
-        if (share.VerifiedAt is null)
-        {
-            return "This shared vault hasn't been verified yet.";
+            return (wholeVaultShare is null && itemShare is null
+                ? "You don't have access to this vault."
+                : "This shared vault hasn't been verified yet.", null);
         }
 
         if (holderUserId != vaultOwnerUserId && !await sharedVaultAccessGrantCache.HasValidGrantAsync(holderUserId, vaultOwnerUserId, ct))
         {
-            return "Enter the emailed code to view this vault.";
+            return ("Enter the emailed code to view this vault.", null);
         }
 
-        return null;
+        return (null, share);
     }
 
     public async Task<ServiceResult<IReadOnlyList<VaultItemViewDto>>> GetItemViewersAsync(Guid ownerUserId, Guid itemId, CancellationToken ct)
@@ -634,8 +715,18 @@ public class VaultService(
             return ServiceResult<SharedVaultAccessChallengeDto>.Success(new SharedVaultAccessChallengeDto(false, null));
         }
 
-        var share = await vaultRepository.GetActiveShareAsync(ownerUserId, holderUserId, ct);
-        if (share is null || share.VerifiedAt is null)
+        // Any active+verified share is enough to pass this session gate - whole-vault or
+        // item-scoped. Without checking item-scoped shares too, a holder who was only ever granted
+        // one specific item could never get past this gate to view it at all.
+        var wholeVaultShare = await vaultRepository.GetActiveShareAsync(ownerUserId, holderUserId, null, ct);
+        var share = wholeVaultShare?.VerifiedAt is not null ? wholeVaultShare : null;
+        if (share is null)
+        {
+            var itemShares = await vaultRepository.GetActiveItemSharesHeldByAsync(holderUserId, ct);
+            share = itemShares.FirstOrDefault(s => s.VaultOwnerUserId == ownerUserId && s.VerifiedAt is not null);
+        }
+
+        if (share is null)
         {
             return ServiceResult<SharedVaultAccessChallengeDto>.Failure("You don't have access to this vault.");
         }
@@ -776,5 +867,6 @@ public class VaultService(
         return VaultShareStatus.Pending;
     }
 
-    private static VaultItemDto ToDto(VaultItem item) => new(item.Id, item.CiphertextBlob, item.CreatedAt, item.UpdatedAt);
+    private static VaultItemDto ToDto(VaultItem item, string? itemShareWrappedKey = null) =>
+        new(item.Id, item.CiphertextBlob, item.WrappedItemKey, itemShareWrappedKey, item.CreatedAt, item.UpdatedAt);
 }
