@@ -17,7 +17,7 @@ import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 
-export const VAULT_ITEM_TYPES = ['Bank login', 'Insurance', 'Medical', 'Other'];
+export const VAULT_ITEM_TYPES = ['Financial Institution Login', 'Insurance', 'Medical', 'Legal Documents', 'Documents', 'Other'];
 
 /** Server-enforced too (see VaultService.UploadAttachmentAsync) - this is just an early,
  * friendlier rejection before the user waits on an upload that would fail anyway. */

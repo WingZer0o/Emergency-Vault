@@ -23,7 +23,7 @@ services:
   api:
     build:
       context: ./backend
-      dockerfile: src/AuthSystem.Api/Dockerfile
+      dockerfile: src/EmergencyVault.Api/Dockerfile
       target: final
     depends_on:
       sqlserver:

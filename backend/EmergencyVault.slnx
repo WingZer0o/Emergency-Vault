@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EmergencyVault.Api/EmergencyVault.Api.csproj" />
+    <Project Path="src/EmergencyVault.Application/EmergencyVault.Application.csproj" />
+    <Project Path="src/EmergencyVault.Domain/EmergencyVault.Domain.csproj" />
+    <Project Path="src/EmergencyVault.Infrastructure/EmergencyVault.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EmergencyVault.Application.Tests/EmergencyVault.Application.Tests.csproj" />
+  </Folder>
+</Solution>

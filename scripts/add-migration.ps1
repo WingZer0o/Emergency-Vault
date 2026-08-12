@@ -26,8 +26,8 @@ if (Test-Path $envFile) {
 Push-Location $backendDir
 try {
     dotnet ef migrations add $Name `
-        --project src/AuthSystem.Infrastructure `
-        --startup-project src/AuthSystem.Api `
+        --project src/EmergencyVault.Infrastructure `
+        --startup-project src/EmergencyVault.Api `
         --output-dir Persistence/Migrations
 } finally {
     Pop-Location

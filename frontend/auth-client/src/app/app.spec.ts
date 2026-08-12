@@ -39,6 +39,6 @@ describe('App', () => {
     await router.navigateByUrl('/dashboard');
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('mat-toolbar')?.textContent).toContain('AuthSystem');
+    expect(compiled.querySelector('mat-toolbar')?.textContent).toContain('Emergency Vault');
   });
 });

@@ -1,0 +1,42 @@
+using EmergencyVault.Application.Dtos;
+
+namespace EmergencyVault.Application.Interfaces;
+
+public interface IVaultService
+{
+    Task<ServiceResult> SetupAsync(Guid userId, VaultSetupRequest request, CancellationToken ct);
+    Task<VaultStatusDto> GetStatusAsync(Guid userId, CancellationToken ct);
+    Task<ServiceResult<VaultUnlockBundleDto>> GetUnlockBundleAsync(Guid userId, CancellationToken ct);
+    Task<ServiceResult> RewrapMasterKeyAsync(Guid userId, VaultRewrapDto request, CancellationToken ct);
+    Task<ServiceResult<VaultResetRecoveryBundleDto>> GetResetRecoveryBundleAsync(Guid userId, string resetToken, CancellationToken ct);
+
+    Task<ServiceResult<VaultItemDto>> CreateItemAsync(Guid ownerUserId, CreateVaultItemRequest request, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultItemDto>>> GetItemsAsync(Guid ownerUserId, CancellationToken ct);
+    Task<ServiceResult<VaultItemDto>> GetItemAsync(Guid ownerUserId, Guid itemId, CancellationToken ct);
+    Task<ServiceResult<VaultItemDto>> UpdateItemAsync(Guid ownerUserId, Guid itemId, UpdateVaultItemRequest request, CancellationToken ct);
+    Task<ServiceResult> DeleteItemAsync(Guid ownerUserId, Guid itemId, CancellationToken ct);
+
+    Task<ServiceResult<VaultItemAttachmentDto>> UploadAttachmentAsync(
+        Guid callerId, Guid itemId, string fileName, string contentType, string ivBase64, long sizeBytes, Stream content, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultItemAttachmentDto>>> GetAttachmentsAsync(Guid callerId, Guid itemId, CancellationToken ct);
+    Task<ServiceResult<(VaultItemAttachmentDto Meta, Stream Content)>> DownloadAttachmentAsync(
+        Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct);
+    Task<ServiceResult> DeleteAttachmentAsync(Guid callerId, Guid itemId, Guid attachmentId, CancellationToken ct);
+
+    Task<ServiceResult<VaultUserLookupDto>> LookupUserAsync(string email, CancellationToken ct);
+    Task<ServiceResult<VaultShareDto>> CreateShareAsync(Guid ownerUserId, CreateVaultShareRequest request, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetSharesAsync(Guid ownerUserId, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultShareDto>>> GetItemSharesAsync(Guid ownerUserId, Guid itemId, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultItemShareDto>>> GetItemSharesHeldByAsync(Guid holderUserId, CancellationToken ct);
+    Task<ServiceResult> RevokeShareAsync(Guid ownerUserId, Guid shareId, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultSharedWithMeDto>>> GetSharedWithMeAsync(Guid holderUserId, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultItemDto>>> GetSharedItemsAsync(Guid holderUserId, Guid vaultOwnerUserId, CancellationToken ct);
+    Task<ServiceResult<VaultItemDto>> GetSharedItemAsync(Guid holderUserId, Guid vaultOwnerUserId, Guid itemId, CancellationToken ct);
+    Task<ServiceResult<IReadOnlyList<VaultItemViewDto>>> GetItemViewersAsync(Guid ownerUserId, Guid itemId, CancellationToken ct);
+    Task<ServiceResult> VerifyShareAsync(Guid holderUserId, Guid shareId, string code, CancellationToken ct);
+    Task<ServiceResult> ResendShareCodeAsync(Guid holderUserId, Guid shareId, CancellationToken ct);
+
+    Task<ServiceResult<SharedVaultAccessChallengeDto>> RequestSharedVaultAccessAsync(Guid holderUserId, Guid ownerUserId, CancellationToken ct);
+    Task<ServiceResult> VerifySharedVaultAccessAsync(Guid holderUserId, string challengeToken, string code, CancellationToken ct);
+    Task<ServiceResult> ResendSharedVaultAccessCodeAsync(Guid holderUserId, string challengeToken, CancellationToken ct);
+}

@@ -6,9 +6,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/backend/src/AuthSystem.Api/bin/Debug/net10.0/AuthSystem.Api.dll",
+            "program": "${workspaceFolder}/backend/src/EmergencyVault.Api/bin/Debug/net10.0/EmergencyVault.Api.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/backend/src/AuthSystem.Api",
+            "cwd": "${workspaceFolder}/backend/src/EmergencyVault.Api",
             "stopAtEntry": false,
             "serverReadyAction": {
                 "action": "openExternally",
@@ -31,7 +31,7 @@
             "name": "Docker: Attach to api (docker compose)",
             "type": "coreclr",
             "request": "attach",
-            "processName": "AuthSystem.Api",
+            "processName": "EmergencyVault.Api",
             "pipeTransport": {
                 "pipeProgram": "docker",
                 "pipeArgs": ["exec", "-i", "application-api-1"],
@@ -40,10 +40,10 @@
                 "quoteArgs": false
             },
             "sourceFileMap": {
-                "/src/src/AuthSystem.Api": "${workspaceFolder}/backend/src/AuthSystem.Api",
-                "/src/src/AuthSystem.Application": "${workspaceFolder}/backend/src/AuthSystem.Application",
-                "/src/src/AuthSystem.Infrastructure": "${workspaceFolder}/backend/src/AuthSystem.Infrastructure",
-                "/src/src/AuthSystem.Domain": "${workspaceFolder}/backend/src/AuthSystem.Domain"
+                "/src/src/EmergencyVault.Api": "${workspaceFolder}/backend/src/EmergencyVault.Api",
+                "/src/src/EmergencyVault.Application": "${workspaceFolder}/backend/src/EmergencyVault.Application",
+                "/src/src/EmergencyVault.Infrastructure": "${workspaceFolder}/backend/src/EmergencyVault.Infrastructure",
+                "/src/src/EmergencyVault.Domain": "${workspaceFolder}/backend/src/EmergencyVault.Domain"
             },
             "justMyCode": false
         },
@@ -53,7 +53,7 @@
             "request": "launch",
             "preLaunchTask": "docker-run: debug",
             "netCore": {
-                "appProject": "${workspaceFolder}/backend/src/AuthSystem.Api/AuthSystem.Api.csproj"
+                "appProject": "${workspaceFolder}/backend/src/EmergencyVault.Api/EmergencyVault.Api.csproj"
             }
         }
     ]

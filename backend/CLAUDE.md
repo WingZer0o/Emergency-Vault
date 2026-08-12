@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Run from `backend/`, or open `AuthSystem.slnx` in Visual Studio.
+Run from `backend/`, or open `EmergencyVault.slnx` in Visual Studio.
 
 ```bash
-dotnet build AuthSystem.slnx                       # build everything
-dotnet watch --project src/AuthSystem.Api run       # run API with hot reload (needs sqlserver+redis up)
+dotnet build EmergencyVault.slnx                       # build everything
+dotnet watch --project src/EmergencyVault.Api run       # run API with hot reload (needs sqlserver+redis up)
 dotnet ef migrations add <Name> \
-  --project src/AuthSystem.Infrastructure \
-  --startup-project src/AuthSystem.Api              # add an EF Core migration
+  --project src/EmergencyVault.Infrastructure \
+  --startup-project src/EmergencyVault.Api              # add an EF Core migration
 dotnet ef database update \
-  --project src/AuthSystem.Infrastructure \
-  --startup-project src/AuthSystem.Api              # apply migrations
+  --project src/EmergencyVault.Infrastructure \
+  --startup-project src/EmergencyVault.Api              # apply migrations
 ```
 
 There are no test projects in the solution yet.
@@ -25,10 +25,10 @@ Infra dependencies (SQL Server, Redis) run via Docker: `docker compose up sqlser
 
 Clean-architecture layering, dependency flow strictly inward (`Api` → `Application`/`Infrastructure` → `Domain`):
 
-- **`AuthSystem.Domain`** — entities only (`ApplicationUser`, `ApplicationRole`, `RefreshToken`, `UserFailedLogin`), constants (`CookieConst`, `EnvironmentVariableConst`). No dependencies on other layers.
-- **`AuthSystem.Application`** — DTOs, service interfaces, and the services implementing the actual business logic (`AuthService`, `UserService`). Services return `ServiceResult<T>` (success/data/errors) rather than throwing for expected failure paths. Registered via `AddApplicationServices()`.
-- **`AuthSystem.Infrastructure`** — EF Core (`AppDbContext`, migrations), repositories, Redis caches, email (Hangfire-queued via `ResendEmailSender`), and security primitives (`TokenService`, `HotpService`, `EcdsaKeyProvider`, Infisical secret injection). Registered via `AddInfrastructure()`.
-- **`AuthSystem.Api`** — thin controllers that call into `Application` services and translate `ServiceResult` into HTTP responses; `Program.cs` wires everything up.
+- **`EmergencyVault.Domain`** — entities only (`ApplicationUser`, `ApplicationRole`, `RefreshToken`, `UserFailedLogin`), constants (`CookieConst`, `EnvironmentVariableConst`). No dependencies on other layers.
+- **`EmergencyVault.Application`** — DTOs, service interfaces, and the services implementing the actual business logic (`AuthService`, `UserService`). Services return `ServiceResult<T>` (success/data/errors) rather than throwing for expected failure paths. Registered via `AddApplicationServices()`.
+- **`EmergencyVault.Infrastructure`** — EF Core (`AppDbContext`, migrations), repositories, Redis caches, email (Hangfire-queued via `ResendEmailSender`), and security primitives (`TokenService`, `HotpService`, `EcdsaKeyProvider`, Infisical secret injection). Registered via `AddInfrastructure()`.
+- **`EmergencyVault.Api`** — thin controllers that call into `Application` services and translate `ServiceResult` into HTTP responses; `Program.cs` wires everything up.
 
 ### Auth flow specifics
 

@@ -16,14 +16,14 @@ services:
     volumes:
       - ./backend:/src
       - nuget_cache:/root/.nuget/packages
-      - api_bin:/src/src/AuthSystem.Api/bin
-      - api_obj:/src/src/AuthSystem.Api/obj
-      - application_bin:/src/src/AuthSystem.Application/bin
-      - application_obj:/src/src/AuthSystem.Application/obj
-      - infrastructure_bin:/src/src/AuthSystem.Infrastructure/bin
-      - infrastructure_obj:/src/src/AuthSystem.Infrastructure/obj
-      - domain_bin:/src/src/AuthSystem.Domain/bin
-      - domain_obj:/src/src/AuthSystem.Domain/obj
+      - api_bin:/src/src/EmergencyVault.Api/bin
+      - api_obj:/src/src/EmergencyVault.Api/obj
+      - application_bin:/src/src/EmergencyVault.Application/bin
+      - application_obj:/src/src/EmergencyVault.Application/obj
+      - infrastructure_bin:/src/src/EmergencyVault.Infrastructure/bin
+      - infrastructure_obj:/src/src/EmergencyVault.Infrastructure/obj
+      - domain_bin:/src/src/EmergencyVault.Domain/bin
+      - domain_obj:/src/src/EmergencyVault.Domain/obj
 
   frontend:
     build:

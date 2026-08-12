@@ -1,4 +1,4 @@
-# AuthSystem
+# EmergencyVault
 
 A full-stack authentication scaffold: ASP.NET Core Identity on .NET 10, Angular 22 + Angular
 Material, EF Core against SQL Server with a repository pattern, and JWTs signed with ECDSA
@@ -20,12 +20,12 @@ fast validation.
 
 ```
 backend/
-  AuthSystem.slnx
+  EmergencyVault.slnx
   src/
-    AuthSystem.Domain          - entities (ApplicationUser, ApplicationRole, RefreshToken)
-    AuthSystem.Application     - DTOs, interfaces, services (business logic)
-    AuthSystem.Infrastructure  - EF Core DbContext, migrations, repositories, Redis, email
-    AuthSystem.Api             - controllers, Program.cs, Dockerfile
+    EmergencyVault.Domain          - entities (ApplicationUser, ApplicationRole, RefreshToken)
+    EmergencyVault.Application     - DTOs, interfaces, services (business logic)
+    EmergencyVault.Infrastructure  - EF Core DbContext, migrations, repositories, Redis, email
+    EmergencyVault.Api             - controllers, Program.cs, Dockerfile
 frontend/
   auth-client/                 - Angular app (core services/guards/interceptors, feature screens)
 docker-compose.yml             - base service definitions (sqlserver, redis, api, frontend)
@@ -69,7 +69,7 @@ Run just the infra in Docker, then debug natively:
 docker compose up sqlserver redis -d
 ```
 
-- Open `backend/AuthSystem.slnx` in Visual Studio and F5 the `AuthSystem.Api` project
+- Open `backend/EmergencyVault.slnx` in Visual Studio and F5 the `EmergencyVault.Api` project
   (`appsettings.Development.json` points at the Docker-exposed `localhost` ports).
 - In `frontend/auth-client`, run `npm install` then `npm start` for the Angular dev server.
 
@@ -83,7 +83,7 @@ docker compose up sqlserver redis -d
 | `Cors:AllowedOrigins` | appsettings / `Cors__AllowedOrigins__0`, `__1`, ... | Must include whatever origin the browser loads the frontend from |
 
 Email confirmation and password reset links are logged to the API console instead of being
-emailed (`AuthSystem.Infrastructure.Email.ConsoleEmailSender`) - swap in a real SMTP/SendGrid
+emailed (`EmergencyVault.Infrastructure.Email.ConsoleEmailSender`) - swap in a real SMTP/SendGrid
 implementation of `IEmailSender` for production.
 
 ## Auth design notes

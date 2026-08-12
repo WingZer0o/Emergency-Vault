@@ -1,4 +1,4 @@
-// Mirrors backend/src/AuthSystem.Application/Dtos/VaultDtos.cs. All wrapped-key/ciphertext
+// Mirrors backend/src/EmergencyVault.Application/Dtos/VaultDtos.cs. All wrapped-key/ciphertext
 // fields here are opaque base64 blobs to this app's HTTP layer - only core/crypto/webcrypto.util.ts
 // and vault-session.service.ts ever look inside them.
 
@@ -84,7 +84,7 @@ export interface CreateVaultShareRequest {
   canEdit: boolean;
 }
 
-/** Mirrors AuthSystem.Application.Dtos.VaultShareStatus - serialized as a string via JsonStringEnumConverter. */
+/** Mirrors EmergencyVault.Application.Dtos.VaultShareStatus - serialized as a string via JsonStringEnumConverter. */
 export type VaultShareStatus = 'Pending' | 'Active' | 'CodeExpired' | 'Failed';
 
 export interface VaultShareDto {
