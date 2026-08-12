@@ -23,7 +23,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: false
-      - name: Build and Deploy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install and build
+        working-directory: frontend/auth-client
+        run: |
+          npm ci
+          npm run build:azure
+      - name: Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -32,8 +40,7 @@ jobs:
           action: "upload"
           app_location: "frontend/auth-client"
           output_location: "dist/auth-client/browser"
-          app_build_command: "npm run build:azure"
-          skip_app_build: false
+          skip_app_build: true
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
