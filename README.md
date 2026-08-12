@@ -94,7 +94,7 @@ implementation of `IEmailSender` for production.
 - **Refresh token**: SQL Server is the source of truth (`RefreshTokens` table, rotated on every
   use, hash stored - not the raw token). Redis mirrors `hash -> userId` with a matching TTL for
   fast validation; a Redis miss falls back to SQL Server rather than failing the request.
-  Delivered as an `httpOnly`, `Secure`, `SameSite=Strict` cookie scoped to `/api/auth`, never
+  Delivered as an `httpOnly`, `Secure`, `SameSite=None` cookie scoped to `/api/auth`, never
   exposed to JavaScript.
 - **Roles**: `Admin` and `User`, seeded on startup. `GET /api/users` is `[Authorize(Roles =
   "Admin")]`; promote a user by inserting into the `UserRoles` table (no admin UI is scaffolded
