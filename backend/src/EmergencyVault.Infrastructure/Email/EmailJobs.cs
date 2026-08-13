@@ -18,7 +18,7 @@ public class EmailJobs
     {
         EmailRequestBody body = new EmailRequestBody()
         {
-            From = "support@mtmulch.com",
+            From = "support@emergencyvault.net",
             To = new List<string> { toEmail },
             Subject = "Email Confirmation",
             Html = $"<p>Please confirm your email by clicking <a href='{confirmationLink}'>here</a>.</p>"
@@ -30,7 +30,7 @@ public class EmailJobs
     {
         EmailRequestBody body = new EmailRequestBody()
         {
-            From = "support@mtmulch.com",
+            From = "support@emergencyvault.net",
             To = new List<string> { toEmail },
             Subject = "Password Reset",
             Html = $"<p>Reset your password by clicking <a href='{resetLink}'>here</a>.</p>"
@@ -42,7 +42,7 @@ public class EmailJobs
     {
         EmailRequestBody body = new EmailRequestBody()
         {
-            From = "support@mtmulch.com",
+            From = "support@emergencyvault.net",
             To = new List<string> { toEmail },
             Subject = "Your verification code",
             Html = $"<p>Your verification code is <strong>{code}</strong>. It expires in 10 minutes.</p>" +
@@ -55,7 +55,7 @@ public class EmailJobs
     {
         EmailRequestBody body = new EmailRequestBody()
         {
-            From = "support@mtmulch.com",
+            From = "support@emergencyvault.net",
             Subject = "Your account has been locked",
             To = new List<string> { toEmail },
             Html = $"<p>Your account has been temporarily locked due to repeated failed sign-in attempts.</p>" +
@@ -69,7 +69,7 @@ public class EmailJobs
     {
         EmailRequestBody body = new EmailRequestBody()
         {
-            From = "support@mtmulch.com",
+            From = "support@emergencyvault.net",
             To = new List<string> { toEmail },
             Subject = $"{ownerDisplayName} shared a vault with you",
             Html = $"<p>{ownerDisplayName} wants to share their vault with you. Enter this code in the app to accept: <strong>{code}</strong>.</p>" +
@@ -83,7 +83,7 @@ public class EmailJobs
     {
         EmailRequestBody body = new EmailRequestBody()
         {
-            From = "support@mtmulch.com",
+            From = "support@emergencyvault.net",
             To = new List<string> { toEmail },
             Subject = $"Your code to view {ownerDisplayName}'s shared vault",
             Html = $"<p>Enter this code in the app to view the vault {ownerDisplayName} shared with you: <strong>{code}</strong>.</p>" +
