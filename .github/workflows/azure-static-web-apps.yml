@@ -1,12 +1,8 @@
 name: Azure Static Web Apps CI/CD
 
+# Handles PR preview deploys/teardown only. The push-to-main deploy lives in deploy.yml, where
+# it runs after the backend Container App deploy job so the API is always live first.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "frontend/auth-client/**"
-      - ".github/workflows/azure-static-web-apps.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
@@ -16,7 +12,7 @@ on:
 
 jobs:
   build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:

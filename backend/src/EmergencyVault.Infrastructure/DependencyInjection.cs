@@ -1,3 +1,4 @@
+using System.Net;
 using EmergencyVault.Application.Interfaces;
 using EmergencyVault.Application.Options;
 using EmergencyVault.Domain.Constant;
@@ -9,6 +10,7 @@ using EmergencyVault.Infrastructure.Repositories;
 using EmergencyVault.Infrastructure.Security;
 using Hangfire;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Azure.StackExchangeRedis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,8 +30,24 @@ public static class DependencyInjection
         services.Configure<FrontendOptions>(configuration.GetSection(FrontendOptions.SectionName));
 
         services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(Environment.GetEnvironmentVariable(EnvironmentVariableConst.RedisConnectionString)
-                ?? throw new InvalidOperationException("Missing ConnectionStrings:Redis configuration.")));
+        {
+            var connectionString = Environment.GetEnvironmentVariable(EnvironmentVariableConst.RedisConnectionString)
+                ?? throw new InvalidOperationException("Missing ConnectionStrings:Redis configuration.");
+
+            var redisOptions = ConfigurationOptions.Parse(connectionString);
+
+            // Azure Managed Redis has no access key (accessKeysAuthentication is disabled on the
+            // cache) - authenticate as the container's own system-assigned managed identity instead.
+            // Local/Docker Redis has no such hostname and keeps using the plain connection string.
+            if (redisOptions.EndPoints.Any(endpoint => endpoint is DnsEndPoint dns
+                && dns.Host.EndsWith(".redis.azure.net", StringComparison.OrdinalIgnoreCase)))
+            {
+                redisOptions.Protocol = RedisProtocol.Resp3;
+                redisOptions.ConfigureForAzureWithSystemAssignedManagedIdentityAsync().GetAwaiter().GetResult();
+            }
+
+            return ConnectionMultiplexer.Connect(redisOptions);
+        });
 
         services.AddHttpContextAccessor();
 
