@@ -13,5 +13,6 @@ namespace EmergencyVault.Domain.Constant
         public const string StripePublishableKey = "STRIPE_PUBLISHABLE_KEY";
         public const string StripeSecretKey = "STRIPE_SECRET_KEY";
         public const string StripeWebhookSecret = "STRIPE_WEBHOOK_SECRET";
+        public const string Domain = "DOMAIN";
     }
 }
