@@ -78,6 +78,29 @@
             </div>
           }
         </dl>
+
+        @if (attachments().length > 0) {
+          <div class="attachments">
+            <h3>Attachments</h3>
+            <ul class="attachment-list">
+              @for (attachment of attachments(); track attachment.id) {
+                <li>
+                  <mat-icon>description</mat-icon>
+                  <span>{{ attachment.fileName }}</span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="downloadAttachment(attachment)"
+                    [disabled]="downloadingId() === attachment.id"
+                    aria-label="Download file"
+                  >
+                    <mat-icon>download</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          </div>
+        }
       </mat-card-content>
     </mat-card>
   }

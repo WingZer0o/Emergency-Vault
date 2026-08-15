@@ -10,8 +10,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
-import { DecryptedVaultItem, VaultItemDto, VaultItemPayload } from '../../../core/models/vault.models';
+import { decryptFileBytes, decryptItemPayload } from '../../../core/crypto/webcrypto.util';
+import { DecryptedVaultItem, VaultItemAttachmentDto, VaultItemDto, VaultItemPayload } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
@@ -50,12 +50,16 @@ export class SharedVaultItemDetail implements OnInit {
   private wrappedUvk: string | null = null;
   /** Which kind of share granted access - determines how loadItem() resolves this item's key. */
   private accessPath: 'whole-vault' | 'item-share' | null = null;
+  /** This item's key, resolved once in loadItem() - reused to decrypt each attachment on download. */
+  private itemKey: CryptoKey | null = null;
 
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly ownerName = signal('');
   readonly item = signal<DecryptedVaultItem | null>(null);
   readonly revealed = signal<ReadonlySet<string>>(new Set());
+  readonly attachments = signal<VaultItemAttachmentDto[]>([]);
+  readonly downloadingId = signal<string | null>(null);
 
   /** Set once the backend says a fresh emailed code is required to view this vault this session. */
   readonly challengeToken = signal<string | null>(null);
@@ -175,13 +179,41 @@ export class SharedVaultItemDetail implements OnInit {
   private async loadItem(): Promise<void> {
     try {
       const dto = await firstValueFrom(this.vaultService.getSharedItem(this.ownerUserId, this.itemId));
-      const itemKey = await this.resolveItemKey(dto);
-      const payload = await decryptItemPayload<VaultItemPayload>(itemKey, dto.ciphertextBlob);
+      this.itemKey = await this.resolveItemKey(dto);
+      const payload = await decryptItemPayload<VaultItemPayload>(this.itemKey, dto.ciphertextBlob);
       this.item.set({ ...payload, id: dto.id, createdAt: dto.createdAt, updatedAt: dto.updatedAt });
+      this.loadAttachments();
     } catch (err) {
       this.errorMessage.set(extractErrorMessage(err as HttpErrorResponse, 'Could not load this item.'));
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private loadAttachments(): void {
+    this.vaultService.getAttachments(this.itemId).subscribe({
+      next: (attachments) => this.attachments.set(attachments),
+      error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not load attachments.')),
+    });
+  }
+
+  async downloadAttachment(attachment: VaultItemAttachmentDto): Promise<void> {
+    this.downloadingId.set(attachment.id);
+    this.errorMessage.set(null);
+    try {
+      const ciphertext = await firstValueFrom(this.vaultService.downloadAttachment(this.itemId, attachment.id));
+      const plaintext = await decryptFileBytes(this.itemKey!, attachment.iv, ciphertext);
+      const blob = new Blob([plaintext], { type: attachment.contentType });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = attachment.fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      this.errorMessage.set(`Could not download ${attachment.fileName}.`);
+    } finally {
+      this.downloadingId.set(null);
     }
   }
 
