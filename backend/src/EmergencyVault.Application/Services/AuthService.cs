@@ -22,6 +22,7 @@ public class AuthService(
     IVaultRepository vaultRepository,
     IEmailSender emailSender,
     IVaultService vaultService,
+    IBillingService billingService,
     IOptions<JwtOptions> jwtOptions,
     IOptions<FrontendOptions> frontendOptions,
     IOptions<Two2FACodesOptions> two2FACodesOptions,
@@ -396,6 +397,11 @@ public class AuthService(
         // FK (see AppDbContext), so any share this user holds - including their own self-share -
         // would otherwise block the delete with a FK constraint violation.
         await vaultRepository.DeleteHoldersSharesByIdAsync(userId, ct);
+
+        // Stripe has no idea the account is about to disappear - cancel any active/past-due
+        // subscription first so the user doesn't keep getting billed after their account is gone.
+        // The Subscriptions row itself cascade-deletes with the user (see AppDbContext).
+        await billingService.CancelSubscriptionAsync(userId, ct);
 
         var result = await userManager.DeleteAsync(user);
         return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());

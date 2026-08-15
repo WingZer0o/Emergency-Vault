@@ -165,17 +165,37 @@ public class BillingService(
         // any Stripe subscription still on file so the user isn't charged while free access is active.
         // Turning free access back off doesn't restore it: the user goes through checkout again, same
         // as anyone else without an active subscription.
-        if (isFreeAccess
-            && !string.IsNullOrEmpty(subscription.StripeSubscriptionId)
-            && subscription.Status is SubscriptionStatus.Active or SubscriptionStatus.PastDue)
+        if (isFreeAccess)
         {
-            await stripeGateway.CancelSubscriptionAsync(subscription.StripeSubscriptionId, ct);
-            subscription.Status = SubscriptionStatus.Canceled;
+            await CancelStripeSubscriptionIfActiveAsync(subscription, ct);
         }
 
         subscription.IsFreeAccess = isFreeAccess;
         subscription.UpdatedAt = DateTimeOffset.UtcNow;
         await repository.SaveChangesAsync(ct);
+    }
+
+    public async Task CancelSubscriptionAsync(Guid userId, CancellationToken ct)
+    {
+        var subscription = await repository.GetSubscriptionAsync(userId, ct);
+        if (subscription is null)
+        {
+            return;
+        }
+
+        await CancelStripeSubscriptionIfActiveAsync(subscription, ct);
+        subscription.UpdatedAt = DateTimeOffset.UtcNow;
+        await repository.SaveChangesAsync(ct);
+    }
+
+    private async Task CancelStripeSubscriptionIfActiveAsync(Subscription subscription, CancellationToken ct)
+    {
+        if (!string.IsNullOrEmpty(subscription.StripeSubscriptionId)
+            && subscription.Status is SubscriptionStatus.Active or SubscriptionStatus.PastDue)
+        {
+            await stripeGateway.CancelSubscriptionAsync(subscription.StripeSubscriptionId, ct);
+            subscription.Status = SubscriptionStatus.Canceled;
+        }
     }
 
     private static bool HasActiveEntitlement(Subscription subscription)

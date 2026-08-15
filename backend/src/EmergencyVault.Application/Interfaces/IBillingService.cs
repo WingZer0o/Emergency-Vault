@@ -17,4 +17,7 @@ public interface IBillingService
 
     Task<IReadOnlyList<AdminSubscriptionRowDto>> ListSubscriptionsAsync(CancellationToken ct);
     Task SetFreeAccessAsync(Guid userId, bool isFreeAccess, CancellationToken ct);
+
+    /// <summary>Cancels any active/past-due Stripe subscription on file for this user. No-op if they never had one. Intended for account deletion - Stripe has no record of the user afterward, so it must be told to stop billing them before their local data is gone.</summary>
+    Task CancelSubscriptionAsync(Guid userId, CancellationToken ct);
 }
