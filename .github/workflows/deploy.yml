@@ -2,6 +2,8 @@ name: Deploy
 
 # Backend and frontend deploy on every push to main, backend first (deploy_frontend has a hard
 # `needs: deploy_backend` dependency below so the API is always live before the SPA that calls it).
+# Tests run on the PR (see test.yml) and are a required check before merge - this workflow trusts
+# that gate and does not re-run tests.
 # Each job's real work is skipped via paths-filter when its own tree didn't change, but the job
 # itself still runs so the ordering dependency always resolves.
 on:

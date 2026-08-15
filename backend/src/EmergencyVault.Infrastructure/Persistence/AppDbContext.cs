@@ -15,6 +15,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<VaultItemAttachment> VaultItemAttachments => Set<VaultItemAttachment>();
     public DbSet<VaultKeyShare> VaultKeyShares => Set<VaultKeyShare>();
     public DbSet<VaultItemView> VaultItemViews => Set<VaultItemView>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<BillingSetting> BillingSettings => Set<BillingSetting>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -156,6 +158,33 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany()
                 .HasForeignKey(v => v.ViewerUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Subscription>(e =>
+        {
+            e.ToTable("Subscriptions");
+            e.HasKey(s => s.Id);
+            e.HasIndex(s => s.UserId).IsUnique();
+            e.Property(s => s.StripeCustomerId).HasMaxLength(255);
+            e.Property(s => s.StripeSubscriptionId).HasMaxLength(255);
+            e.HasOne(s => s.User)
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<BillingSetting>(e =>
+        {
+            e.ToTable("BillingSettings");
+            e.HasKey(b => b.Id);
+            e.Property(b => b.Currency).HasMaxLength(8);
+            e.HasData(new BillingSetting
+            {
+                Id = BillingSetting.SingletonId,
+                YearlyPriceCents = 5000,
+                Currency = "usd",
+                UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            });
         });
     }
 }
