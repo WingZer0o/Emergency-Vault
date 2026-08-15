@@ -158,6 +158,19 @@ public class BillingService(
     public async Task SetFreeAccessAsync(Guid userId, bool isFreeAccess, CancellationToken ct)
     {
         var subscription = await GetOrCreateSubscriptionAsync(userId, ct);
+
+        // Granting free access replaces a paid subscription rather than sitting alongside it - cancel
+        // any Stripe subscription still on file so the user isn't charged while free access is active.
+        // Turning free access back off doesn't restore it: the user goes through checkout again, same
+        // as anyone else without an active subscription.
+        if (isFreeAccess
+            && !string.IsNullOrEmpty(subscription.StripeSubscriptionId)
+            && subscription.Status is SubscriptionStatus.Active or SubscriptionStatus.PastDue)
+        {
+            await stripeGateway.CancelSubscriptionAsync(subscription.StripeSubscriptionId, ct);
+            subscription.Status = SubscriptionStatus.Canceled;
+        }
+
         subscription.IsFreeAccess = isFreeAccess;
         subscription.UpdatedAt = DateTimeOffset.UtcNow;
         await repository.SaveChangesAsync(ct);
@@ -170,7 +183,11 @@ public class BillingService(
             return true;
         }
 
-        if (subscription.Status != SubscriptionStatus.Active)
+        // Canceled still counts as entitled until CurrentPeriodEnd passes - the user already paid for
+        // this period (whether they canceled themselves via the portal or an admin canceled it when
+        // granting free access), so access should run out with the period, not the moment Status flips.
+        // PastDue gets no such grace: a failed payment is not a period the user has paid for.
+        if (subscription.Status is not (SubscriptionStatus.Active or SubscriptionStatus.Canceled))
         {
             return false;
         }
