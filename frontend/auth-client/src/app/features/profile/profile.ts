@@ -16,12 +16,12 @@ import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog
 import { extractErrorMessage } from '../auth/auth-error.util';
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-profile',
   imports: [MatCardModule, MatListModule, MatButtonModule, MatChipsModule, MatProgressSpinnerModule, MatSlideToggleModule],
-  templateUrl: './dashboard.html',
-  styleUrl: './dashboard.scss',
+  templateUrl: './profile.html',
+  styleUrls: ['./profile.scss'],
 })
-export class Dashboard implements OnInit {
+export class Profile implements OnInit {
   private readonly http = inject(HttpClient);
   protected readonly authService = inject(AuthService);
   private readonly vaultSession = inject(VaultSessionService);

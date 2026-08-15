@@ -39,9 +39,9 @@ export const routes: Routes = [
       import('./features/auth/unlock-account/unlock-account').then((m) => m.UnlockAccount),
   },
   {
-    path: 'dashboard',
+    path: 'profile',
     canActivate: [authGuard, subscriptionGuard],
-    loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
+    loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
   },
   {
     path: 'billing',

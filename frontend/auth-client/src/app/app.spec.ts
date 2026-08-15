@@ -36,7 +36,7 @@ describe('App', () => {
   it('should render the toolbar title on non-landing routes', async () => {
     const fixture = TestBed.createComponent(App);
     const router = TestBed.inject(Router);
-    await router.navigateByUrl('/dashboard');
+    await router.navigateByUrl('/profile');
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('mat-toolbar')?.textContent).toContain('Emergency Vault');

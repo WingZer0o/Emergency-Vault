@@ -64,7 +64,7 @@ export class Login {
           this.twoFactorToken.set(response.twoFactorToken);
         } else {
           this.tryUnlockVault();
-          this.router.navigateByUrl('/dashboard');
+          this.router.navigateByUrl('/profile');
         }
       },
       error: (err) => {
@@ -88,7 +88,7 @@ export class Login {
       next: () => {
         this.loading.set(false);
         this.tryUnlockVault();
-        this.router.navigateByUrl('/dashboard');
+        this.router.navigateByUrl('/profile');
       },
       error: (err) => {
         this.loading.set(false);
