@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using EmergencyVault.Application.Dtos;
 using EmergencyVault.Application.Interfaces;
 using EmergencyVault.Application.Options;
@@ -130,7 +131,7 @@ public class AuthService(
         var secret = Convert.FromBase64String(user.TwoFactorSecret);
         var expectedCode = hotpService.GenerateCode(secret, challenge.Counter, _two2FACodesOptions.CodeLength);
 
-        if (!CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(code), System.Text.Encoding.UTF8.GetBytes(expectedCode)))
+        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(code), Encoding.UTF8.GetBytes(expectedCode)))
         {
             await userManager.AccessFailedAsync(user);
             if (await userManager.IsLockedOutAsync(user))
