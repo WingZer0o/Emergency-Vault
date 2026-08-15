@@ -44,5 +44,8 @@ public interface IStripeGateway
     /// <summary>Creates a Stripe Billing Portal session so the customer can update their card or cancel, without us building either flow ourselves.</summary>
     Task<string> CreatePortalSessionUrlAsync(string customerId, string returnUrl, CancellationToken ct);
 
+    /// <summary>Cancels a Stripe subscription immediately (not at period end) so no further charges occur.</summary>
+    Task CancelSubscriptionAsync(string subscriptionId, CancellationToken ct);
+
     ParsedStripeEvent ConstructWebhookEvent(string payload, string signatureHeader);
 }

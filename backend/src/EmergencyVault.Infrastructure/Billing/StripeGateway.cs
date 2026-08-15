@@ -89,6 +89,12 @@ public class StripeGateway : IStripeGateway
         return session.Url;
     }
 
+    public async Task CancelSubscriptionAsync(string subscriptionId, CancellationToken ct)
+    {
+        var service = new SubscriptionService();
+        await service.CancelAsync(subscriptionId, cancellationToken: ct);
+    }
+
     public ParsedStripeEvent ConstructWebhookEvent(string payload, string signatureHeader)
     {
         var webhookSecret = Environment.GetEnvironmentVariable(EnvironmentVariableConst.StripeWebhookSecret)
