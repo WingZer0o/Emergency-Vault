@@ -19,6 +19,7 @@ public class AuthService(
     IRefreshTokenRepository refreshTokenRepository,
     IRefreshTokenCache refreshTokenCache,
     IUserFailedLoginRepository userFailedLoginRepository,
+    IUserLoginHistoryRepository userLoginHistoryRepository,
     IVaultRepository vaultRepository,
     IEmailSender emailSender,
     IVaultService vaultService,
@@ -104,6 +105,8 @@ public class AuthService(
             return ServiceResult<LoginResult>.Success(new LoginResult(true, challengeToken, null));
         }
 
+        await NotifyIfNewIpAsync(user, ipAddress, ct);
+
         var result = await IssueTokenPairAsync(user, ipAddress, ct);
         return ServiceResult<LoginResult>.Success(new LoginResult(false, null, result));
     }
@@ -158,6 +161,7 @@ public class AuthService(
 
         await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
         await userManager.ResetAccessFailedCountAsync(user);
+        await NotifyIfNewIpAsync(user, ipAddress, ct);
         var result = await IssueTokenPairAsync(user, ipAddress, ct);
         return ServiceResult<AuthResult>.Success(result);
     }
@@ -233,6 +237,34 @@ public class AuthService(
             AttemptedByIp = ipAddress,
         }, ct);
         await userFailedLoginRepository.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Checks whether this IP has been seen for a successful login by this user before; if not, emails
+    /// them a new-sign-in alert. Records the login either way so future attempts can be recognized.
+    /// </summary>
+    private async Task NotifyIfNewIpAsync(ApplicationUser user, string? ipAddress, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(ipAddress))
+        {
+            return;
+        }
+
+        var isKnownIp = await userLoginHistoryRepository.HasLoggedInFromIpAsync(user.Id, ipAddress, ct);
+        var loggedInAt = DateTimeOffset.UtcNow;
+        if (!isKnownIp)
+        {
+            await emailSender.SendNewIpLoginAsync(user.Email!, ipAddress, loggedInAt, ct);
+        }
+
+        await userLoginHistoryRepository.AddAsync(new UserLoginHistory
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            IpAddress = ipAddress,
+            LoggedInAt = loggedInAt,
+        }, ct);
+        await userLoginHistoryRepository.SaveChangesAsync(ct);
     }
 
     private async Task SendAccountLockedEmailAsync(ApplicationUser user, CancellationToken ct)

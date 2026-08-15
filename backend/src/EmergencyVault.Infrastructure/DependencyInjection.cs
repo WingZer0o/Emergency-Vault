@@ -72,6 +72,7 @@ public static class DependencyInjection
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUserFailedLoginRepository, UserFailedLoginRepository>();
+        services.AddScoped<IUserLoginHistoryRepository, UserLoginHistoryRepository>();
         services.AddScoped<IVaultRepository, VaultRepository>();
         services.AddScoped<IVaultAttachmentBlobStore, SqlVaultAttachmentBlobStore>();
         services.AddScoped<IBillingRepository, BillingRepository>();
