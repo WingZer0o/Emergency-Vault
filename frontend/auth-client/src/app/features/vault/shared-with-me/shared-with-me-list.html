@@ -13,7 +13,7 @@
   } @else {
     <mat-card>
       <mat-list>
-        @for (share of shares(); track share.id) {
+        @for (share of pagedShares(); track share.id) {
           <mat-list-item (click)="onItemClick(share)" class="vault-item" [class.disabled]="share.status === 'Failed'">
             <span matListItemTitle>{{ share.ownerName }}</span>
             <span matListItemLine
@@ -63,6 +63,15 @@
           }
         }
       </mat-list>
+      @if (shares().length > pageSize) {
+        <mat-paginator
+          [length]="shares().length"
+          [pageSize]="pageSize"
+          [pageIndex]="sharesPageIndex()"
+          [hidePageSize]="true"
+          (page)="onSharesPage($event)"
+        />
+      }
     </mat-card>
   }
 
@@ -70,7 +79,7 @@
     <h2 class="section-heading">Items shared with me</h2>
     <mat-card>
       <mat-list>
-        @for (share of itemShares(); track share.shareId) {
+        @for (share of pagedItemShares(); track share.shareId) {
           <mat-list-item (click)="onItemShareClick(share)" class="vault-item" [class.disabled]="share.status === 'Failed'">
             <span matListItemTitle>{{ share.ownerName }}</span>
             <span matListItemLine
@@ -120,6 +129,15 @@
           }
         }
       </mat-list>
+      @if (itemShares().length > pageSize) {
+        <mat-paginator
+          [length]="itemShares().length"
+          [pageSize]="pageSize"
+          [pageIndex]="itemSharesPageIndex()"
+          [hidePageSize]="true"
+          (page)="onItemSharesPage($event)"
+        />
+      }
     </mat-card>
   }
 </div>

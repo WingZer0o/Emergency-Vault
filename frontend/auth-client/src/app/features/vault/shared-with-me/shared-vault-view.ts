@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -9,6 +9,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
@@ -33,6 +34,7 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
     MatFormFieldModule,
     MatInputModule,
     MatListModule,
+    MatPaginatorModule,
     MatProgressSpinnerModule,
   ],
   templateUrl: './shared-vault-view.html',
@@ -50,10 +52,19 @@ export class SharedVaultView implements OnInit {
   /** Captured once the share is resolved, so it can be unwrapped after a pending code challenge is cleared. */
   private wrappedUvk: string | null = null;
 
+  /** Fixed page size - the paginator itself is only shown once the list exceeds this. */
+  readonly pageSize = 10;
+
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly ownerName = signal('');
   readonly items = signal<DecryptedVaultItem[]>([]);
+  readonly pageIndex = signal(0);
+
+  readonly pagedItems = computed(() => {
+    const start = this.pageIndex() * this.pageSize;
+    return this.items().slice(start, start + this.pageSize);
+  });
 
   /** Set once the backend says a fresh emailed code is required to view this vault this session. */
   readonly challengeToken = signal<string | null>(null);
@@ -137,6 +148,10 @@ export class SharedVaultView implements OnInit {
     this.router.navigateByUrl(`/vault/shared-with-me/${this.ownerUserId}/items/${itemId}`);
   }
 
+  onPage(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+  }
+
   private async loadVaultContents(): Promise<void> {
     try {
       const uvk = await this.vaultSession.unwrapSharedUvk(this.wrappedUvk!);
@@ -151,6 +166,7 @@ export class SharedVaultView implements OnInit {
         }),
       );
       this.items.set(decrypted);
+      this.pageIndex.set(0);
     } catch (err) {
       this.errorMessage.set(extractErrorMessage(err as HttpErrorResponse, 'Could not load this vault.'));
     } finally {

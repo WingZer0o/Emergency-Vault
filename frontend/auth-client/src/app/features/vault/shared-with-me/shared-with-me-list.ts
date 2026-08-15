@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { VaultItemShareDto, VaultShareStatus, VaultSharedWithMeDto } from '../../../core/models/vault.models';
@@ -22,6 +23,7 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
     MatFormFieldModule,
     MatInputModule,
     MatListModule,
+    MatPaginatorModule,
     MatProgressSpinnerModule,
   ],
   templateUrl: './shared-with-me-list.html',
@@ -32,11 +34,27 @@ export class SharedWithMeList implements OnInit {
   private readonly vaultService = inject(VaultService);
   private readonly router = inject(Router);
 
+  /** Fixed page size - the paginator itself is only shown once a list exceeds this. */
+  readonly pageSize = 10;
+
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly shares = signal<VaultSharedWithMeDto[]>([]);
   /** Items shared with the current user individually - separate from shares(), which is whole-vault only. */
   readonly itemShares = signal<VaultItemShareDto[]>([]);
+
+  readonly sharesPageIndex = signal(0);
+  readonly itemSharesPageIndex = signal(0);
+
+  readonly pagedShares = computed(() => {
+    const start = this.sharesPageIndex() * this.pageSize;
+    return this.shares().slice(start, start + this.pageSize);
+  });
+
+  readonly pagedItemShares = computed(() => {
+    const start = this.itemSharesPageIndex() * this.pageSize;
+    return this.itemShares().slice(start, start + this.pageSize);
+  });
 
   /** Which share's inline "enter code" form is currently open, if any - shareId is unique across
    * both shares() and itemShares(), so one signal covers whichever list it came from. */
@@ -119,6 +137,14 @@ export class SharedWithMeList implements OnInit {
     });
   }
 
+  onSharesPage(event: PageEvent): void {
+    this.sharesPageIndex.set(event.pageIndex);
+  }
+
+  onItemSharesPage(event: PageEvent): void {
+    this.itemSharesPageIndex.set(event.pageIndex);
+  }
+
   resendCode(shareId: string): void {
     this.verifyError.set(null);
     this.resendMessage.set(null);
@@ -133,6 +159,7 @@ export class SharedWithMeList implements OnInit {
     this.vaultService.getSharedWithMe().subscribe({
       next: (shares) => {
         this.shares.set(shares);
+        this.sharesPageIndex.set(0);
         this.loading.set(false);
       },
       error: (err) => {
@@ -144,7 +171,10 @@ export class SharedWithMeList implements OnInit {
 
   private loadItemShares(): void {
     this.vaultService.getItemSharesHeldByMe().subscribe({
-      next: (shares) => this.itemShares.set(shares),
+      next: (shares) => {
+        this.itemShares.set(shares);
+        this.itemSharesPageIndex.set(0);
+      },
       // Non-critical - whole-vault shares above still work if this list fails to load.
       error: () => {},
     });
