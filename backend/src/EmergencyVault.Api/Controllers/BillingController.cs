@@ -11,6 +11,7 @@ namespace EmergencyVault.Api.Controllers;
 public class BillingController(IBillingService billingService, ILogger<BillingController> logger) : ControllerBase
 {
     [HttpGet("status")]
+    [Authorize(Roles = "User")]
     public async Task<IActionResult> Status(CancellationToken ct)
     {
         var status = await billingService.GetStatusAsync(User.GetUserId(), ct);
@@ -18,6 +19,7 @@ public class BillingController(IBillingService billingService, ILogger<BillingCo
     }
 
     [HttpPost("checkout-session")]
+    [Authorize(Roles = "User")]
     public async Task<IActionResult> CreateCheckoutSession(CancellationToken ct)
     {
         var session = await billingService.CreateCheckoutSessionAsync(User.GetUserId(), ct);
@@ -26,6 +28,7 @@ public class BillingController(IBillingService billingService, ILogger<BillingCo
 
     /// <summary>Stripe-hosted portal where a user can update their card or cancel, without us building either flow.</summary>
     [HttpPost("portal-session")]
+    [Authorize(Roles = "User")]
     public async Task<IActionResult> CreatePortalSession(CancellationToken ct)
     {
         try
