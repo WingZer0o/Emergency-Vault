@@ -1,0 +1,35 @@
+<div class="admin-subscriptions-page">
+  <h1>User subscriptions</h1>
+
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (errorMessage(); as message) {
+    <p class="error-text">{{ message }}</p>
+  } @else {
+    <mat-card>
+      <mat-list>
+        @for (row of rows(); track row.userId; let last = $last) {
+          <mat-list-item class="subscription-row">
+            <span matListItemTitle>{{ row.firstName }} {{ row.lastName }}</span>
+            <span matListItemLine>{{ row.email }}</span>
+            <div matListItemMeta class="subscription-meta">
+              <mat-chip-set>
+                <mat-chip>{{ row.status }}</mat-chip>
+              </mat-chip-set>
+              <mat-slide-toggle
+                [checked]="row.isFreeAccess"
+                [disabled]="savingUserId() === row.userId"
+                (change)="onFreeAccessToggle(row, $event)"
+              >
+                Free access
+              </mat-slide-toggle>
+            </div>
+          </mat-list-item>
+          @if (!last) {
+            <mat-divider></mat-divider>
+          }
+        }
+      </mat-list>
+    </mat-card>
+  }
+</div>

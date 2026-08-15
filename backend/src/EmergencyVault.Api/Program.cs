@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using EmergencyVault.Api.Authorization;
 using EmergencyVault.Application;
 using EmergencyVault.Application.Options;
 using EmergencyVault.Domain.Constant;
@@ -6,12 +7,17 @@ using EmergencyVault.Infrastructure;
 using EmergencyVault.Infrastructure.Persistence;
 using EmergencyVault.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Stripe;
 
 var builder = WebApplication.CreateBuilder(args);
 await InfisicalSetup.InjectEmailAPISecrets();
+
+StripeConfiguration.ApiKey = Environment.GetEnvironmentVariable(EnvironmentVariableConst.StripeSecretKey)
+    ?? throw new InvalidOperationException($"Missing {EnvironmentVariableConst.StripeSecretKey} environment variable.");
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Missing Jwt configuration section.");
@@ -59,7 +65,13 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddScoped<IAuthorizationHandler, ActiveSubscriptionHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("ActiveSubscription", policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new ActiveSubscriptionRequirement()));
+});
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>

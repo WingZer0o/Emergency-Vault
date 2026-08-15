@@ -8,7 +8,7 @@ namespace EmergencyVault.Api.Controllers;
 
 [ApiController]
 [Route("api/vault")]
-[Authorize]
+[Authorize(Policy = "ActiveSubscription")]
 public class VaultController(IVaultService vaultService) : ControllerBase
 {
     [HttpPost("setup")]
