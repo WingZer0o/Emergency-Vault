@@ -3,6 +3,7 @@ using EmergencyVault.Application.Interfaces;
 using EmergencyVault.Application.Options;
 using EmergencyVault.Domain.Constant;
 using EmergencyVault.Domain.Entities;
+using EmergencyVault.Infrastructure.Billing;
 using EmergencyVault.Infrastructure.Caching;
 using EmergencyVault.Infrastructure.Email;
 using EmergencyVault.Infrastructure.Persistence;
@@ -73,6 +74,8 @@ public static class DependencyInjection
         services.AddScoped<IUserFailedLoginRepository, UserFailedLoginRepository>();
         services.AddScoped<IVaultRepository, VaultRepository>();
         services.AddScoped<IVaultAttachmentBlobStore, SqlVaultAttachmentBlobStore>();
+        services.AddScoped<IBillingRepository, BillingRepository>();
+        services.AddScoped<IStripeGateway, StripeGateway>();
         services.AddSingleton<IRefreshTokenCache, RedisRefreshTokenCache>();
         services.AddScoped<IEmailSender, ResendEmailSender>();
         services.AddScoped<EmailJobs>();

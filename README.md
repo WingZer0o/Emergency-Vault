@@ -79,8 +79,25 @@ docker compose up sqlserver redis -d
 |---|---|---|
 | `SA_PASSWORD` | `.env` (gitignored, copy from `.env.example`) | SQL Server sa password |
 | `JWT_SIGNING_KEY_PEM` | Infisical secret, injected as an environment variable | ECDSA P-521 PEM key used to sign JWTs |
-| `Frontend:BaseUrl` | appsettings / `Frontend__BaseUrl` | Used to build email confirmation / password reset links |
+| `Frontend:BaseUrl` | appsettings / `Frontend__BaseUrl` | Used to build email confirmation / password reset links, and the Stripe Checkout success/cancel redirect |
 | `Cors:AllowedOrigins` | appsettings / `Cors__AllowedOrigins__0`, `__1`, ... | Must include whatever origin the browser loads the frontend from |
+| `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` | Infisical secret, injected as environment variables | Stripe API keys for the yearly membership paywall (test-mode keys for local dev) |
+| `STRIPE_WEBHOOK_SECRET` | Infisical secret, injected as an environment variable | Verifies the signature on `POST /api/billing/webhook`; see below for how to get one locally |
+
+### Billing / Stripe locally
+
+The yearly membership price is admin-configurable (`/admin/billing-settings`) - it isn't read from
+config. Stripe can't reach `localhost` directly, so webhook events (subscription activation,
+renewal, cancellation) need the [Stripe CLI](https://docs.stripe.com/stripe-cli) forwarding to the
+API:
+
+```bash
+stripe listen --forward-to localhost:8080/api/billing/webhook
+```
+
+The CLI prints a `whsec_...` signing secret on startup - put that in Infisical's `dev` environment
+as `STRIPE_WEBHOOK_SECRET`. In production, create the webhook endpoint in the Stripe Dashboard
+against `<deployed-api-url>/api/billing/webhook` instead, and use the secret it generates.
 
 Email confirmation and password reset links are logged to the API console instead of being
 emailed (`EmergencyVault.Infrastructure.Email.ConsoleEmailSender`) - swap in a real SMTP/SendGrid
@@ -133,6 +150,9 @@ SQL_SERVER_CONNECTION_STRING=Server=tcp:ev-sql-try-5059.database.windows.net,143
 REDIS_CONNECTION_STRING=ev-redis-5059.westus2.redis.azure.net:10000,ssl=True,abortConnect=False
 JWT_SIGNING_KEY_PEM=<production ECDSA P-521 key>
 RESEND_API_KEY=<production Resend key>
+STRIPE_SECRET_KEY=<live-mode Stripe secret key>
+STRIPE_PUBLISHABLE_KEY=<live-mode Stripe publishable key>
+STRIPE_WEBHOOK_SECRET=<signing secret from the live-mode webhook endpoint in the Stripe Dashboard>
 ```
 
 To redeploy the backend manually (e.g. outside CI):
@@ -153,12 +173,20 @@ az containerapp update -n ev-backend -g Application --image evbackendacr.azurecr
   Delivered as an `httpOnly`, `Secure`, `SameSite=None` cookie scoped to `/api/auth`, never
   exposed to JavaScript.
 - **Roles**: `Admin` and `User`, seeded on startup. `GET /api/users` is `[Authorize(Roles =
-  "Admin")]`; promote a user by inserting into the `UserRoles` table (no admin UI is scaffolded
-  yet).
+  "Admin")]`; promote a user by inserting into the `UserRoles` table (still no UI for this one -
+  the `/admin` screens cover billing, not role management).
 - **Repository pattern**: applied to `RefreshToken` (`IRefreshTokenRepository`), the entity EF
   Core actually owns here. User/Role persistence goes through ASP.NET Identity's
   `UserManager`/`RoleManager`, which are themselves Microsoft's repository abstraction over EF
   Core - wrapping them again would just be ceremony.
+- **Billing paywall**: `VaultController` is gated by the `ActiveSubscription` authorization policy
+  (`Api/Authorization/ActiveSubscriptionHandler.cs`) - satisfied by the `Admin` role, an admin-
+  granted free-access flag, or an active Stripe subscription (`Subscription` table, one row per
+  user). The yearly price lives in the `BillingSettings` singleton row, editable at
+  `/admin/billing-settings` with no deploy required. Checkout uses Stripe Checkout in
+  `subscription` mode with inline `price_data` (see `BillingService.CreateCheckoutSessionAsync`)
+  rather than a synced Stripe Price object, so a price change takes effect on the very next
+  checkout.
 
 ## Verification checklist
 
@@ -169,3 +197,10 @@ az containerapp update -n ev-backend -g Application --image evbackendacr.azurecr
 5. `POST /api/auth/refresh` (cookie only) - rotates the refresh token.
 6. `GET /api/users` - 403 for a plain `User`, 200 after promoting to `Admin`.
 7. Decode the access token (e.g. jwt.io) - header should show `"alg": "ES512"`.
+8. `GET /api/vault/status` as a fresh `User` with no subscription - 403 (`ActiveSubscription`
+   policy). Visiting `/vault` in the browser redirects to `/billing` instead.
+9. `POST /api/billing/checkout-session` - returns a Stripe Checkout URL; completing it with
+   Stripe's `4242 4242 4242 4242` test card (with `stripe listen` running) fires the webhook and
+   flips the user's `Subscription.Status` to `Active` - `/api/vault/status` now returns 200.
+10. As `Admin`, `PUT /api/admin/billing/subscriptions/{userId}/free-access` with
+    `{ "isFreeAccess": true }` - that user gets vault access without ever completing checkout.

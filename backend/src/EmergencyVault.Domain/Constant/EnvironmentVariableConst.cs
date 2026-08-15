@@ -10,5 +10,8 @@ namespace EmergencyVault.Domain.Constant
         public const string ResendApiKey = "RESEND_API_KEY";
         public const string SqlServerConnectionString = "SQL_SERVER_CONNECTION_STRING";
         public const string RedisConnectionString = "REDIS_CONNECTION_STRING";
+        public const string StripePublishableKey = "STRIPE_PUBLISHABLE_KEY";
+        public const string StripeSecretKey = "STRIPE_SECRET_KEY";
+        public const string StripeWebhookSecret = "STRIPE_WEBHOOK_SECRET";
     }
 }
