@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<UserFailedLogin> UserFailedLogins => Set<UserFailedLogin>();
+    public DbSet<UserLoginHistory> UserLoginHistories => Set<UserLoginHistory>();
     public DbSet<VaultProfile> VaultProfiles => Set<VaultProfile>();
     public DbSet<VaultItem> VaultItems => Set<VaultItem>();
     public DbSet<VaultItemAttachment> VaultItemAttachments => Set<VaultItemAttachment>();
@@ -53,6 +54,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany(u => u.FailedLogins)
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<UserLoginHistory>(e =>
+        {
+            e.ToTable("UserLoginHistories");
+            e.HasKey(t => t.Id);
+            e.Property(t => t.IpAddress).HasMaxLength(45).IsRequired();
+            e.HasIndex(t => new { t.UserId, t.IpAddress });
+            e.HasOne(t => t.User)
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<VaultProfile>(e =>

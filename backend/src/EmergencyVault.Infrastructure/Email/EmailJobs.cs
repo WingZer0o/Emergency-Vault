@@ -65,6 +65,20 @@ public class EmailJobs
         await SendEmailAsync(body);
     }
 
+    public async Task SendNewIpLoginAsync(string toEmail, string ipAddress, DateTimeOffset loggedInAt)
+    {
+        EmailRequestBody body = new EmailRequestBody()
+        {
+            From = "support@emergencyvault.net",
+            To = new List<string> { toEmail },
+            Subject = "New sign-in to your account",
+            Html = $"<p>Your account was just signed into from a new IP address: <strong>{ipAddress}</strong> " +
+                   $"at {loggedInAt.UtcDateTime:yyyy-MM-dd HH:mm} UTC.</p>" +
+                   "<p>If this was you, you can ignore this email. If it wasn't, reset your password immediately.</p>"
+        };
+        await SendEmailAsync(body);
+    }
+
     public async Task SendVaultShareCodeAsync(string toEmail, string code, string ownerDisplayName)
     {
         EmailRequestBody body = new EmailRequestBody()

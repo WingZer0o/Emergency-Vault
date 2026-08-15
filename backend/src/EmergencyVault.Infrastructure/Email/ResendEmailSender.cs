@@ -33,6 +33,12 @@ public class ResendEmailSender(IBackgroundJobClient backgroundJobClient) : IEmai
         return Task.CompletedTask;
     }
 
+    public Task SendNewIpLoginAsync(string toEmail, string ipAddress, DateTimeOffset loggedInAt, CancellationToken ct)
+    {
+        backgroundJobClient.Enqueue<EmailJobs>(job => job.SendNewIpLoginAsync(toEmail, ipAddress, loggedInAt));
+        return Task.CompletedTask;
+    }
+
     public Task SendVaultShareCodeAsync(string toEmail, string code, string ownerDisplayName, CancellationToken ct)
     {
         backgroundJobClient.Enqueue<EmailJobs>(job => job.SendVaultShareCodeAsync(toEmail, code, ownerDisplayName));

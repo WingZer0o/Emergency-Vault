@@ -281,6 +281,30 @@ namespace EmergencyVault.Infrastructure.Persistence.Migrations
                     b.ToTable("UserFailedLogins", (string)null);
                 });
 
+            modelBuilder.Entity("EmergencyVault.Domain.Entities.UserLoginHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("IpAddress")
+                        .IsRequired()
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<DateTimeOffset>("LoggedInAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IpAddress");
+
+                    b.ToTable("UserLoginHistories", (string)null);
+                });
+
             modelBuilder.Entity("EmergencyVault.Domain.Entities.VaultItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -626,6 +650,17 @@ namespace EmergencyVault.Infrastructure.Persistence.Migrations
                         .WithMany("FailedLogins")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EmergencyVault.Domain.Entities.UserLoginHistory", b =>
+                {
+                    b.HasOne("EmergencyVault.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
