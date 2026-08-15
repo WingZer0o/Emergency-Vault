@@ -11,8 +11,10 @@ namespace EmergencyVault.Application.Tests;
 /// <summary>
 /// Covers the authorization-sensitive paths of VaultService specifically - not full coverage.
 /// A bug here means one user's encrypted vault (bank credentials, etc.) leaking to another user,
-/// so these are the cases that matter most: cross-user access, self-targeting, revocation, and
-/// (since sharing added an email verification gate) whether an unverified share is truly inert.
+/// so these are the cases that matter most: cross-user access, self-targeting, revocation, item
+/// scoping (an item-scoped share holder must never reach another item or the owner's whole list),
+/// and the two email-code gates layered on sharing - accepting an invite (VerifyShareAsync) and,
+/// separately, the per-session access challenge required on every subsequent view.
 /// </summary>
 public class VaultServiceTests
 {
@@ -34,8 +36,15 @@ public class VaultServiceTests
         var repo = new FakeVaultRepository();
         var email = new FakeEmailSender();
         var service = new VaultService(
-            repo, userManager, new FakeHotpService(), email,
-            Microsoft.Extensions.Options.Options.Create(shareCodesOptions ?? new VaultShareCodesOptions()));
+            repo,
+            new FakeVaultAttachmentBlobStore(),
+            userManager,
+            new FakeHotpService(),
+            email,
+            new FakeSharedVaultAccessChallengeCache(),
+            new FakeSharedVaultAccessGrantCache(),
+            Microsoft.Extensions.Options.Options.Create(shareCodesOptions ?? new VaultShareCodesOptions()),
+            NullLogger<VaultService>.Instance);
         return (repo, userManager, service, email);
     }
 
@@ -57,6 +66,34 @@ public class VaultServiceTests
             "mlKemPub", "mlKemSecretMaster", "mlKemSecretRecovery");
         var result = await service.SetupAsync(userId, request, CancellationToken.None);
         Assert.True(result.Succeeded);
+    }
+
+    /// <summary>Creates a share and immediately accepts the invite (VerifyShareAsync) with the code that was emailed for it.</summary>
+    private static async Task<VaultShareDto> CreateAndAcceptShareAsync(
+        VaultService service, FakeEmailSender email, Guid ownerId, Guid holderId, string holderEmail,
+        Guid? vaultItemId = null, bool canEdit = false)
+    {
+        var share = await service.CreateShareAsync(ownerId, new CreateVaultShareRequest(holderEmail, "wrapped", vaultItemId, canEdit), CancellationToken.None);
+        Assert.True(share.Succeeded);
+        var code = email.VaultShareCodesSent.Last(c => c.ToEmail == holderEmail).Code;
+        var verify = await service.VerifyShareAsync(holderId, share.Data!.Id, code, CancellationToken.None);
+        Assert.True(verify.Succeeded);
+        return share.Data!;
+    }
+
+    /// <summary>Passes the separate per-session access challenge (RequestSharedVaultAccessAsync/VerifySharedVaultAccessAsync) required before an accepted share can actually be viewed.</summary>
+    private static async Task GrantSessionAccessAsync(VaultService service, FakeEmailSender email, Guid holderId, Guid ownerId)
+    {
+        var challenge = await service.RequestSharedVaultAccessAsync(holderId, ownerId, CancellationToken.None);
+        Assert.True(challenge.Succeeded);
+        if (!challenge.Data!.RequiresCode)
+        {
+            return;
+        }
+
+        var code = email.VaultShareCodesSent.Last().Code;
+        var verify = await service.VerifySharedVaultAccessAsync(holderId, challenge.Data.ChallengeToken!, code, CancellationToken.None);
+        Assert.True(verify.Succeeded);
     }
 
     [Fact]
@@ -95,7 +132,7 @@ public class VaultServiceTests
         var item = new VaultItem { Id = Guid.NewGuid(), OwnerUserId = ownerId, CiphertextBlob = "secret" };
         repo.Items.Add(item);
 
-        var result = await service.UpdateItemAsync(attackerId, item.Id, new UpdateVaultItemRequest("tampered"), CancellationToken.None);
+        var result = await service.UpdateItemAsync(attackerId, item.Id, new UpdateVaultItemRequest("tampered", null), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal("secret", item.CiphertextBlob);
@@ -123,7 +160,7 @@ public class VaultServiceTests
         var owner = await CreateUserAsync(users, "owner@example.com");
         await SetUpVaultAsync(service, owner.Id);
 
-        var result = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("owner@example.com", "wrapped"), CancellationToken.None);
+        var result = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("owner@example.com", "wrapped", null, false), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -136,7 +173,7 @@ public class VaultServiceTests
         await SetUpVaultAsync(service, owner.Id);
         await CreateUserAsync(users, "novault@example.com");
 
-        var result = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("novault@example.com", "wrapped"), CancellationToken.None);
+        var result = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("novault@example.com", "wrapped", null, false), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -149,7 +186,23 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, holder.Id);
 
-        var result = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var result = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task CreateShareAsync_Fails_WhenItemScoped_AndItemNotYetMigratedToPerItemKey()
+    {
+        var (repo, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var legacyItem = new VaultItem { Id = Guid.NewGuid(), OwnerUserId = owner.Id, CiphertextBlob = "secret", WrappedItemKey = null };
+        repo.Items.Add(legacyItem);
+
+        var result = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", legacyItem.Id, false), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -163,14 +216,14 @@ public class VaultServiceTests
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
 
-        var first = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped-v1"), CancellationToken.None);
-        var second = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped-v2"), CancellationToken.None);
+        var first = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped-v1", null, false), CancellationToken.None);
+        var second = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped-v2", null, false), CancellationToken.None);
 
         Assert.True(first.Succeeded);
         Assert.True(second.Succeeded);
         var activeShares = repo.Shares.Where(s => s.VaultOwnerUserId == owner.Id && s.HolderUserId == holder.Id && s.RevokedAt is null);
         Assert.Single(activeShares);
-        Assert.Equal("wrapped-v2", activeShares.Single().WrappedUvk);
+        Assert.Equal("wrapped-v2", activeShares.Single().WrappedKey);
     }
 
     [Fact]
@@ -182,7 +235,7 @@ public class VaultServiceTests
         var attacker = await CreateUserAsync(users, "attacker@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
 
         var result = await service.RevokeShareAsync(attacker.Id, share.Data!.Id, CancellationToken.None);
 
@@ -205,24 +258,6 @@ public class VaultServiceTests
     }
 
     [Fact]
-    public async Task ReleaseHeldSharesAsync_RemovesEveryShareHeldByUser_IncludingSelfShare()
-    {
-        var (repo, users, service, _) = CreateService();
-        var owner = await CreateUserAsync(users, "owner@example.com");
-        var holder = await CreateUserAsync(users, "holder@example.com");
-        await SetUpVaultAsync(service, owner.Id);
-        await SetUpVaultAsync(service, holder.Id);
-        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
-
-        await service.ReleaseHeldSharesAsync(holder.Id, CancellationToken.None);
-
-        // Every row where holder is the Holder - their own self-share and the cross-user grant - is gone.
-        Assert.DoesNotContain(repo.Shares, s => s.HolderUserId == holder.Id);
-        // Rows where holder is only the VaultOwner (irrelevant here) or another user's self-share are untouched.
-        Assert.Contains(repo.Shares, s => s.VaultOwnerUserId == owner.Id && s.HolderUserId == owner.Id);
-    }
-
-    [Fact]
     public async Task GetSharedItemsAsync_Fails_AfterRevocation()
     {
         var (_, users, service, email) = CreateService();
@@ -230,13 +265,12 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
-        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext"), CancellationToken.None);
-        var sentCode = email.VaultShareCodesSent.Single(c => c.ToEmail == "holder@example.com").Code;
-        await service.VerifyShareAsync(holder.Id, share.Data!.Id, sentCode, CancellationToken.None);
+        var share = await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com");
+        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext", "wrappedItemKey"), CancellationToken.None);
+        await GrantSessionAccessAsync(service, email, holder.Id, owner.Id);
 
         var beforeRevoke = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
-        await service.RevokeShareAsync(owner.Id, share.Data!.Id, CancellationToken.None);
+        await service.RevokeShareAsync(owner.Id, share.Id, CancellationToken.None);
         var afterRevoke = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
 
         Assert.True(beforeRevoke.Succeeded);
@@ -309,8 +343,26 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
-        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext"), CancellationToken.None);
+        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
+        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext", "wrappedItemKey"), CancellationToken.None);
+
+        var result = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task GetSharedItemsAsync_Fails_WhenInviteAccepted_ButSessionAccessNotYetVerified()
+    {
+        // Accepting the invite (VerifyShareAsync) only proves the holder owns that inbox once - it
+        // must not by itself grant standing access; every viewing session needs its own passed
+        // challenge via RequestSharedVaultAccessAsync/VerifySharedVaultAccessAsync.
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com");
 
         var result = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
 
@@ -325,7 +377,7 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
 
         var result = await service.GetSharedWithMeAsync(holder.Id, CancellationToken.None);
 
@@ -342,16 +394,16 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
-        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext"), CancellationToken.None);
-        var sentCode = email.VaultShareCodesSent.Single().Code;
+        var share = await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com");
+        await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext", "wrappedItemKey"), CancellationToken.None);
+        await GrantSessionAccessAsync(service, email, holder.Id, owner.Id);
 
-        var verify = await service.VerifyShareAsync(holder.Id, share.Data!.Id, sentCode, CancellationToken.None);
         var items = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
+        var status = (await service.GetSharesAsync(owner.Id, CancellationToken.None)).Data!.Single(s => s.Id == share.Id).Status;
 
-        Assert.True(verify.Succeeded);
         Assert.True(items.Succeeded);
         Assert.Single(items.Data!);
+        Assert.Equal(VaultShareStatus.Active, status);
     }
 
     [Fact]
@@ -362,7 +414,7 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
 
         var result = await service.VerifyShareAsync(holder.Id, share.Data!.Id, "000000", CancellationToken.None);
 
@@ -378,7 +430,7 @@ public class VaultServiceTests
         var attacker = await CreateUserAsync(users, "attacker@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
         var sentCode = email.VaultShareCodesSent.Single().Code;
 
         var result = await service.VerifyShareAsync(attacker.Id, share.Data!.Id, sentCode, CancellationToken.None);
@@ -394,7 +446,7 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
 
         for (var i = 0; i < new VaultShareCodesOptions().MaxAttempts; i++)
         {
@@ -413,7 +465,7 @@ public class VaultServiceTests
         var holder = await CreateUserAsync(users, "holder@example.com");
         await SetUpVaultAsync(service, owner.Id);
         await SetUpVaultAsync(service, holder.Id);
-        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped"), CancellationToken.None);
+        var share = await service.CreateShareAsync(owner.Id, new CreateVaultShareRequest("holder@example.com", "wrapped", null, false), CancellationToken.None);
         var firstCode = email.VaultShareCodesSent.Single().Code;
         await service.VerifyShareAsync(holder.Id, share.Data!.Id, "000000", CancellationToken.None);
 
@@ -424,5 +476,129 @@ public class VaultServiceTests
         Assert.True(resend.Succeeded);
         Assert.NotEqual(firstCode, secondCode);
         Assert.True(verify.Succeeded);
+    }
+
+    [Fact]
+    public async Task RequestSharedVaultAccessAsync_NeverRequiresCode_ForOwnVault()
+    {
+        var (_, _, service, _) = CreateService();
+        var userId = Guid.NewGuid();
+        await SetUpVaultAsync(service, userId);
+
+        var result = await service.RequestSharedVaultAccessAsync(userId, userId, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.False(result.Data!.RequiresCode);
+    }
+
+    [Fact]
+    public async Task VerifySharedVaultAccessAsync_Fails_WithWrongCode()
+    {
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com");
+        var challenge = await service.RequestSharedVaultAccessAsync(holder.Id, owner.Id, CancellationToken.None);
+
+        var result = await service.VerifySharedVaultAccessAsync(holder.Id, challenge.Data!.ChallengeToken!, "000000", CancellationToken.None);
+        var items = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.False(items.Succeeded);
+    }
+
+    [Fact]
+    public async Task GetSharedItemAsync_Fails_ForItemScopedHolder_OnADifferentItem()
+    {
+        // The core promise of a per-item share: a holder scoped to one item must never be able to
+        // reach a different item in the same owner's vault, even one they know the id of.
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var sharedItem = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("shared", "wrappedItemKey1"), CancellationToken.None);
+        var otherItem = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("other", "wrappedItemKey2"), CancellationToken.None);
+        await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com", sharedItem.Data!.Id);
+        await GrantSessionAccessAsync(service, email, holder.Id, owner.Id);
+
+        var allowed = await service.GetSharedItemAsync(holder.Id, owner.Id, sharedItem.Data!.Id, CancellationToken.None);
+        var denied = await service.GetSharedItemAsync(holder.Id, owner.Id, otherItem.Data!.Id, CancellationToken.None);
+
+        Assert.True(allowed.Succeeded);
+        Assert.False(denied.Succeeded);
+    }
+
+    [Fact]
+    public async Task GetSharedItemsAsync_Fails_ForItemScopedOnlyHolder()
+    {
+        // Whole-vault listing must stay unreachable via an item-scoped-only share - otherwise a
+        // holder granted just one item could learn the existence/count of the owner's other items.
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var item = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext", "wrappedItemKey"), CancellationToken.None);
+        await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com", item.Data!.Id);
+        await GrantSessionAccessAsync(service, email, holder.Id, owner.Id);
+
+        var result = await service.GetSharedItemsAsync(holder.Id, owner.Id, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task UpdateItemAsync_Succeeds_ForItemScopedHolder_WithCanEditAndSessionGrant()
+    {
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var item = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext", "wrappedItemKey"), CancellationToken.None);
+        await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com", item.Data!.Id, canEdit: true);
+        await GrantSessionAccessAsync(service, email, holder.Id, owner.Id);
+
+        var result = await service.UpdateItemAsync(holder.Id, item.Data!.Id, new UpdateVaultItemRequest("updated", null), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task UpdateItemAsync_Fails_ForItemScopedHolder_WithoutCanEdit()
+    {
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var item = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext", "wrappedItemKey"), CancellationToken.None);
+        await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com", item.Data!.Id, canEdit: false);
+        await GrantSessionAccessAsync(service, email, holder.Id, owner.Id);
+
+        var result = await service.UpdateItemAsync(holder.Id, item.Data!.Id, new UpdateVaultItemRequest("updated", null), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task UpdateItemAsync_Fails_ForItemScopedHolder_WithCanEdit_ButNoSessionGrant()
+    {
+        // CanWriteItemAsync requires both an active+verified+CanEdit share AND a live session grant -
+        // accepting the share invite alone must not be enough to write.
+        var (_, users, service, email) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var holder = await CreateUserAsync(users, "holder@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        await SetUpVaultAsync(service, holder.Id);
+        var item = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("ciphertext", "wrappedItemKey"), CancellationToken.None);
+        await CreateAndAcceptShareAsync(service, email, owner.Id, holder.Id, "holder@example.com", item.Data!.Id, canEdit: true);
+
+        var result = await service.UpdateItemAsync(holder.Id, item.Data!.Id, new UpdateVaultItemRequest("updated", null), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
     }
 }

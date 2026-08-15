@@ -1,0 +1,19 @@
+.admin-subscriptions-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.subscription-row {
+  height: auto !important;
+  padding: 12px 0;
+}
+
+.subscription-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
