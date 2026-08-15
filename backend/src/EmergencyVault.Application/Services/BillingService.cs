@@ -1,5 +1,6 @@
 using EmergencyVault.Application.Dtos;
 using EmergencyVault.Application.Interfaces;
+using EmergencyVault.Domain.Constant;
 using EmergencyVault.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -45,7 +46,8 @@ public class BillingService(
         // Built server-side from the DOMAIN environment variable (same source AuthService uses for
         // its email links) rather than accepted from the client, to avoid an open-redirect via a
         // caller-supplied success/cancel URL.
-        var domain = Environment.GetEnvironmentVariable("DOMAIN");
+        var domain = Environment.GetEnvironmentVariable(EnvironmentVariableConst.Domain)
+            ?? throw new InvalidOperationException("DOMAIN environment variable not set.");
         var successUrl = $"{domain}/billing?success=1";
         var cancelUrl = $"{domain}/billing?canceled=1";
 
@@ -63,7 +65,7 @@ public class BillingService(
             throw new InvalidOperationException("No billing history for this user yet.");
         }
 
-        var returnUrl = $"{Environment.GetEnvironmentVariable("DOMAIN")}/billing";
+        var returnUrl = $"{Environment.GetEnvironmentVariable(EnvironmentVariableConst.Domain)}/billing";
         var url = await stripeGateway.CreatePortalSessionUrlAsync(subscription.StripeCustomerId, returnUrl, ct);
         return new CheckoutSessionDto(url);
     }
