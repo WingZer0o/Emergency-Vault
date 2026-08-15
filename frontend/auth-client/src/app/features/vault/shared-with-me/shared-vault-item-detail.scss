@@ -48,3 +48,32 @@
     gap: 4px;
   }
 }
+
+.attachments {
+  margin: 16px 0 0;
+
+  h3 {
+    font-size: 14px;
+    color: var(--mat-sys-on-surface-variant);
+    margin: 0 0 8px;
+  }
+}
+
+.attachment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    span {
+      flex: 1;
+    }
+  }
+}
