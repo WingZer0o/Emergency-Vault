@@ -137,12 +137,23 @@ public class StripeGateway : IStripeGateway
 
         var periodEndItem = subscription.Items.Data.FirstOrDefault();
 
+        // A self-service cancellation via the billing portal schedules the cancellation (CanceledAt
+        // gets set) but Stripe's own subscription.status stays "active" until the period actually
+        // ends - relying on MapStatus alone would silently ignore the cancellation until then. Newer
+        // API versions don't reliably set CancelAtPeriodEnd for this either, so CanceledAt being
+        // non-null is the one signal that holds regardless of how the cancellation was scheduled.
+        // Reflecting it as Canceled immediately is safe: HasActiveEntitlement already keeps a
+        // Canceled subscription's access alive through CurrentPeriodEnd. A reverted cancellation
+        // (resumed before period end) clears CanceledAt again, so this falls back to MapStatus and
+        // correctly reports Active.
+        var status = subscription.CanceledAt is not null ? SubscriptionStatus.Canceled : MapStatus(subscription.Status);
+
         return new ParsedStripeEvent(
             type,
             subscription.CustomerId,
             subscription.Id,
             ParseUserId(subscription.Metadata),
-            MapStatus(subscription.Status),
+            status,
             periodEndItem is null ? null : new DateTimeOffset(periodEndItem.CurrentPeriodEnd, TimeSpan.Zero));
     }
 
