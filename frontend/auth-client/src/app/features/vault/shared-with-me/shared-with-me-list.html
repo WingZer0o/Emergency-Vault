@@ -63,15 +63,7 @@
           }
         }
       </mat-list>
-      @if (shares().length > pageSize) {
-        <mat-paginator
-          [length]="shares().length"
-          [pageSize]="pageSize"
-          [pageIndex]="sharesPageIndex()"
-          [hidePageSize]="true"
-          (page)="onSharesPage($event)"
-        />
-      }
+      <app-paginator [length]="shares().length" [(pageIndex)]="sharesPageIndex" />
     </mat-card>
   }
 
@@ -129,15 +121,7 @@
           }
         }
       </mat-list>
-      @if (itemShares().length > pageSize) {
-        <mat-paginator
-          [length]="itemShares().length"
-          [pageSize]="pageSize"
-          [pageIndex]="itemSharesPageIndex()"
-          [hidePageSize]="true"
-          (page)="onItemSharesPage($event)"
-        />
-      }
+      <app-paginator [length]="itemShares().length" [(pageIndex)]="itemSharesPageIndex" />
     </mat-card>
   }
 </div>

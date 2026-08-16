@@ -1,0 +1,5 @@
+// Every current usage sits at the bottom of a mat-card, so let the card's own surface show
+// through rather than stacking a second background on top of it.
+mat-paginator {
+  background: transparent;
+}

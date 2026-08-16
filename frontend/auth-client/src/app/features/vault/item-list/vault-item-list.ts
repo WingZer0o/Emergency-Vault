@@ -10,9 +10,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
 import { DecryptedVaultItem, VaultItemPayload } from '../../../core/models/vault.models';
+import { PaginationService } from '../../../core/services/pagination.service';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { ItemViewersDialog } from '../../../shared/item-viewers-dialog/item-viewers-dialog';
+import { Paginator } from '../../../shared/paginator/paginator';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 
 @Component({
@@ -26,6 +28,7 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
     MatIconModule,
     MatListModule,
     MatProgressSpinnerModule,
+    Paginator,
   ],
   templateUrl: './vault-item-list.html',
   styleUrl: './vault-item-list.scss',
@@ -35,10 +38,14 @@ export class VaultItemList implements OnInit {
   private readonly vaultSession = inject(VaultSessionService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly pagination = inject(PaginationService);
 
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly items = signal<DecryptedVaultItem[]>([]);
+
+  readonly pageIndex = signal(0);
+  readonly pagedItems = this.pagination.slice(this.items, this.pageIndex);
 
   ngOnInit(): void {
     this.loadItems();
@@ -78,6 +85,7 @@ export class VaultItemList implements OnInit {
             }),
           );
           this.items.set(decrypted);
+          this.pageIndex.set(0);
         } catch {
           this.errorMessage.set('Could not decrypt your vault items.');
         } finally {

@@ -70,15 +70,7 @@
           }
         }
       </mat-list>
-      @if (items().length > pageSize) {
-        <mat-paginator
-          [length]="items().length"
-          [pageSize]="pageSize"
-          [pageIndex]="pageIndex()"
-          [hidePageSize]="true"
-          (page)="onPage($event)"
-        />
-      }
+      <app-paginator [length]="items().length" [(pageIndex)]="pageIndex" />
     </mat-card>
   }
 </div>

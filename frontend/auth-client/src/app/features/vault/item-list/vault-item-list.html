@@ -20,7 +20,7 @@
   } @else {
     <mat-card>
       <mat-list>
-        @for (item of items(); track item.id; let last = $last) {
+        @for (item of pagedItems(); track item.id; let last = $last) {
           <mat-list-item (click)="openItem(item.id)" class="vault-item">
             <span matListItemTitle>{{ item.label }}</span>
             <span matListItemLine>{{ item.itemType }}</span>
@@ -41,6 +41,7 @@
           }
         }
       </mat-list>
+      <app-paginator [length]="items().length" [(pageIndex)]="pageIndex" />
     </mat-card>
   }
 </div>
