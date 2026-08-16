@@ -7,7 +7,6 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 
-import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { VaultSessionService } from '../../core/services/vault-session.service';
 import { UserProfile } from '../../core/models/auth.models';
