@@ -2,19 +2,21 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { decryptFileBytes, decryptItemPayload } from '../../../core/crypto/webcrypto.util';
+import { decryptFileBytes, decryptItemPayload, encryptItemPayload } from '../../../core/crypto/webcrypto.util';
 import { DecryptedVaultItem, VaultItemAttachmentDto, VaultItemDto, VaultItemPayload } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
+import { VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
 
 /**
  * Opens exactly one item from a vault shared with the current user. Unlike SharedVaultView (the
@@ -31,6 +33,7 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatProgressSpinnerModule,
   ],
   templateUrl: './shared-vault-item-detail.html',
@@ -71,6 +74,22 @@ export class SharedVaultItemDetail implements OnInit {
     code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
   });
 
+  /** True only for a CanEdit item-scoped share - a whole-vault share is always read-only. */
+  readonly canEdit = signal(false);
+  readonly editing = signal(false);
+  readonly saving = signal(false);
+  readonly itemTypes = VAULT_ITEM_TYPES;
+
+  readonly form = this.fb.nonNullable.group({
+    label: ['', [Validators.required]],
+    itemType: [VAULT_ITEM_TYPES[0], [Validators.required]],
+    fields: this.fb.array([this.createFieldGroup()]),
+  });
+
+  get fields(): FormArray {
+    return this.form.controls.fields;
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       // Prefer a whole-vault share if the holder has one; otherwise fall back to an item-scoped
@@ -102,6 +121,7 @@ export class SharedVaultItemDetail implements OnInit {
         }
         this.ownerName.set(itemShare.ownerName);
         this.accessPath = 'item-share';
+        this.canEdit.set(itemShare.canEdit);
       }
 
       const challenge = await firstValueFrom(this.vaultService.requestSharedVaultAccess(this.ownerUserId));
@@ -176,12 +196,65 @@ export class SharedVaultItemDetail implements OnInit {
     await navigator.clipboard.writeText(value);
   }
 
+  startEditing(): void {
+    this.editing.set(true);
+  }
+
+  cancelEditing(): void {
+    this.editing.set(false);
+  }
+
+  addField(): void {
+    this.fields.push(this.createFieldGroup());
+  }
+
+  removeField(index: number): void {
+    this.fields.removeAt(index);
+  }
+
+  save(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.saving.set(true);
+    this.errorMessage.set(null);
+
+    const raw = this.form.getRawValue();
+    const payload: VaultItemPayload = { label: raw.label, itemType: raw.itemType, fields: raw.fields };
+
+    encryptItemPayload(this.itemKey!, payload)
+      .then((ciphertextBlob) => firstValueFrom(this.vaultService.updateItem(this.itemId, { ciphertextBlob })))
+      .then(() => {
+        this.item.update((current) => ({ ...current!, ...payload }));
+        this.saving.set(false);
+        this.editing.set(false);
+      })
+      .catch((err) => {
+        this.saving.set(false);
+        this.errorMessage.set(
+          err instanceof HttpErrorResponse ? extractErrorMessage(err, 'Could not save changes.') : 'Could not encrypt item.',
+        );
+      });
+  }
+
+  private createFieldGroup(name = '', value = '') {
+    return this.fb.nonNullable.group({
+      name: [name, [Validators.required]],
+      value: [value, [Validators.required]],
+    });
+  }
+
   private async loadItem(): Promise<void> {
     try {
       const dto = await firstValueFrom(this.vaultService.getSharedItem(this.ownerUserId, this.itemId));
       this.itemKey = await this.resolveItemKey(dto);
       const payload = await decryptItemPayload<VaultItemPayload>(this.itemKey, dto.ciphertextBlob);
       this.item.set({ ...payload, id: dto.id, createdAt: dto.createdAt, updatedAt: dto.updatedAt });
+      this.form.patchValue({ label: payload.label, itemType: payload.itemType });
+      this.fields.clear();
+      payload.fields.forEach((field) => this.fields.push(this.createFieldGroup(field.name, field.value)));
       this.loadAttachments();
     } catch (err) {
       this.errorMessage.set(extractErrorMessage(err as HttpErrorResponse, 'Could not load this item.'));
