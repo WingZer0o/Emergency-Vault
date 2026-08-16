@@ -213,6 +213,16 @@ public class VaultService(
             item.WrappedItemKey = request.WrappedItemKey;
         }
 
+        // Snapshot the outgoing ciphertext before overwriting it - decryptable with whatever key
+        // decrypts the item's current CiphertextBlob, since the item key itself never changes here.
+        await vaultRepository.AddItemRevisionAsync(new VaultItemRevision
+        {
+            Id = Guid.NewGuid(),
+            VaultItemId = item.Id,
+            PreviousCiphertextBlob = item.CiphertextBlob,
+            ChangedByUserId = callerId,
+        }, ct);
+
         item.CiphertextBlob = request.CiphertextBlob;
         item.UpdatedAt = DateTimeOffset.UtcNow;
         await vaultRepository.SaveChangesAsync(ct);
@@ -622,6 +632,22 @@ public class VaultService(
             .Select(v => new VaultItemViewDto(v.ViewerUserId, $"{v.Viewer.FirstName} {v.Viewer.LastName}", v.Viewer.Email!, v.ViewedAt))
             .ToList();
         return ServiceResult<IReadOnlyList<VaultItemViewDto>>.Success(dtos);
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<VaultItemRevisionDto>>> GetItemRevisionsAsync(Guid ownerUserId, Guid itemId, CancellationToken ct)
+    {
+        var item = await vaultRepository.GetItemAsync(itemId, ownerUserId, ct);
+        if (item is null)
+        {
+            return ServiceResult<IReadOnlyList<VaultItemRevisionDto>>.Failure("Item not found.");
+        }
+
+        var revisions = await vaultRepository.GetRevisionsForItemAsync(itemId, ct);
+        var dtos = revisions
+            .Select(r => new VaultItemRevisionDto(
+                r.Id, r.PreviousCiphertextBlob, r.ChangedByUserId, $"{r.ChangedBy.FirstName} {r.ChangedBy.LastName}", r.ChangedBy.Email!, r.ChangedAt))
+            .ToList();
+        return ServiceResult<IReadOnlyList<VaultItemRevisionDto>>.Success(dtos);
     }
 
     public async Task<ServiceResult> VerifyShareAsync(Guid holderUserId, Guid shareId, string code, CancellationToken ct)

@@ -83,6 +83,11 @@ public record VaultItemShareDto(
 
 public record VaultItemViewDto(Guid ViewerUserId, string ViewerName, string ViewerEmail, DateTimeOffset ViewedAt);
 
+/// <summary>One prior version of an item's ciphertext, from just before an edit. PreviousCiphertextBlob
+/// decrypts with whichever key decrypts the item's current CiphertextBlob - see VaultItemRevision.</summary>
+public record VaultItemRevisionDto(
+    Guid Id, string PreviousCiphertextBlob, Guid ChangedByUserId, string ChangedByName, string ChangedByEmail, DateTimeOffset ChangedAt);
+
 public record VerifyVaultShareRequest([Required, StringLength(6, MinimumLength = 6)] string Code);
 
 public record SharedVaultAccessChallengeDto(bool RequiresCode, string? ChallengeToken);

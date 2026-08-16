@@ -26,6 +26,7 @@ import { wrapAesKeyForRecipient } from '../../../core/crypto/hybrid-kem.util';
 import { VaultItemAttachmentDto, VaultItemPayload, VaultShareDto } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { ItemRevisionsDialog } from '../../../shared/item-revisions-dialog/item-revisions-dialog';
 import { ShareItemDialog, ShareItemDialogResult } from '../../../shared/share-item-dialog/share-item-dialog';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { ALLOWED_ATTACHMENT_EXTENSIONS, VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
@@ -256,6 +257,12 @@ export class VaultItemDetail implements OnInit {
     } finally {
       this.sharingItem.set(false);
     }
+  }
+
+  viewHistory(): void {
+    this.dialog.open(ItemRevisionsDialog, {
+      data: { itemId: this.itemId, itemKey: this.itemKey!, uvk: this.vaultSession.uvk },
+    });
   }
 
   revokeItemShare(shareId: string): void {

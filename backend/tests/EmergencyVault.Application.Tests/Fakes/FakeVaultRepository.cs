@@ -14,6 +14,7 @@ public class FakeVaultRepository : IVaultRepository
     public readonly List<VaultKeyShare> Shares = [];
     public readonly List<VaultItemAttachment> Attachments = [];
     public readonly List<VaultItemView> ItemViews = [];
+    public readonly List<VaultItemRevision> ItemRevisions = [];
 
     public Task<VaultProfile?> GetProfileAsync(Guid userId, CancellationToken ct) =>
         Task.FromResult(Profiles.FirstOrDefault(p => p.UserId == userId));
@@ -117,6 +118,22 @@ public class FakeVaultRepository : IVaultRepository
     public Task<IReadOnlyList<VaultItemView>> GetViewsForItemAsync(Guid vaultItemId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<VaultItemView>>(
             ItemViews.Where(v => v.VaultItemId == vaultItemId).OrderByDescending(v => v.ViewedAt).Take(50).ToList());
+
+    public Task RemoveAllItemRevisionsForItemAsync(Guid changedByUserId, CancellationToken ct)
+    {
+        ItemRevisions.RemoveAll(r => r.ChangedByUserId == changedByUserId);
+        return Task.CompletedTask;
+    }
+
+    public Task AddItemRevisionAsync(VaultItemRevision revision, CancellationToken ct)
+    {
+        ItemRevisions.Add(revision);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<VaultItemRevision>> GetRevisionsForItemAsync(Guid vaultItemId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<VaultItemRevision>>(
+            ItemRevisions.Where(r => r.VaultItemId == vaultItemId).OrderByDescending(r => r.ChangedAt).Take(50).ToList());
 
     public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
 }

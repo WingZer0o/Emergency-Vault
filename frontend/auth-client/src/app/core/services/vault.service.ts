@@ -11,6 +11,7 @@ import {
   UpdateVaultItemRequest,
   VaultItemAttachmentDto,
   VaultItemDto,
+  VaultItemRevisionDto,
   VaultItemShareDto,
   VaultItemViewDto,
   VaultRecoverRequest,
@@ -78,6 +79,11 @@ export class VaultService {
 
   getItemViews(itemId: string): Observable<VaultItemViewDto[]> {
     return this.http.get<VaultItemViewDto[]>(`${this.baseUrl}/items/${itemId}/views`);
+  }
+
+  /** Owner-only edit history for an item, newest first - see VaultItemRevisionDto. */
+  getItemRevisions(itemId: string): Observable<VaultItemRevisionDto[]> {
+    return this.http.get<VaultItemRevisionDto[]>(`${this.baseUrl}/items/${itemId}/revisions`);
   }
 
   /** Who this item is individually shared with (owner's view) - separate from getShares(), which is whole-vault only. */

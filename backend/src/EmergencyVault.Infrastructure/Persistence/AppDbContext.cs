@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<VaultItemAttachment> VaultItemAttachments => Set<VaultItemAttachment>();
     public DbSet<VaultKeyShare> VaultKeyShares => Set<VaultKeyShare>();
     public DbSet<VaultItemView> VaultItemViews => Set<VaultItemView>();
+    public DbSet<VaultItemRevision> VaultItemRevisions => Set<VaultItemRevision>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<BillingSetting> BillingSettings => Set<BillingSetting>();
 
@@ -170,6 +171,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasOne(v => v.Viewer)
                 .WithMany()
                 .HasForeignKey(v => v.ViewerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<VaultItemRevision>(e =>
+        {
+            e.ToTable("VaultItemRevisions");
+            e.HasKey(r => r.Id);
+            e.Property(r => r.PreviousCiphertextBlob).IsRequired();
+            e.HasIndex(r => r.VaultItemId);
+            e.HasOne(r => r.VaultItem)
+                .WithMany()
+                .HasForeignKey(r => r.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Restrict, not Cascade: VaultItem already has a Cascade path into Users via Owner, so a
+            // second cascade path from this table into Users (via ChangedBy) would give SQL Server
+            // multiple cascade paths and the migration would fail to apply - same rationale as
+            // VaultItemView.Viewer above.
+            e.HasOne(r => r.ChangedBy)
+                .WithMany()
+                .HasForeignKey(r => r.ChangedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
