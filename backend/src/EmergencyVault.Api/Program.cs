@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Threading.RateLimiting;
 using EmergencyVault.Api.Authorization;
 using EmergencyVault.Application;
 using EmergencyVault.Application.Options;
@@ -64,6 +65,19 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
+
+
+builder.Services.AddRateLimiter(options =>
+{
+   options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 50,
+            Window = TimeSpan.FromMinutes(1)
+        })); 
+});
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -140,6 +154,7 @@ app.UseExceptionHandler();
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 await DbInitializer.InitializeAsync(app.Services);
