@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { refreshInterceptor } from './core/interceptors/refresh.interceptor';
+import { AnalyticsService } from './core/services/analytics.service';
 import { AuthService } from './core/services/auth.service';
 import { VaultSessionService } from './core/services/vault-session.service';
 
@@ -21,5 +22,8 @@ export const appConfig: ApplicationConfig = {
     // vaultUnlockedGuard sees the correct isUnlocked() state on the very first navigation
     // instead of momentarily redirecting to the unlock screen after every refresh.
     provideAppInitializer(() => inject(VaultSessionService).restoreFromStorage()),
+    // AnalyticsService is providedIn: 'root' but otherwise never injected anywhere, so this
+    // forces Angular to construct it (and start listening to router events) at bootstrap.
+    provideAppInitializer(() => void inject(AnalyticsService)),
   ],
 };
