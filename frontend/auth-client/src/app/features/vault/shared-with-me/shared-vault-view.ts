@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -9,14 +9,16 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
 import { DecryptedVaultItem, VaultItemPayload } from '../../../core/models/vault.models';
+import { PaginationService } from '../../../core/services/pagination.service';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { Paginator } from '../../../shared/paginator/paginator';
 import { extractErrorMessage } from '../../auth/auth-error.util';
+import { PageEvent } from '@angular/material/paginator';
 
 /**
  * Lists the items in a shared vault so a holder can pick one to open. Listing itself is never
@@ -34,8 +36,8 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
     MatFormFieldModule,
     MatInputModule,
     MatListModule,
-    MatPaginatorModule,
     MatProgressSpinnerModule,
+    Paginator,
   ],
   templateUrl: './shared-vault-view.html',
   styleUrl: './shared-vault-view.scss',
@@ -46,14 +48,12 @@ export class SharedVaultView implements OnInit {
   private readonly router = inject(Router);
   private readonly vaultService = inject(VaultService);
   private readonly vaultSession = inject(VaultSessionService);
+  private readonly pagination = inject(PaginationService);
 
   readonly ownerUserId = this.route.snapshot.paramMap.get('ownerUserId') ?? '';
 
   /** Captured once the share is resolved, so it can be unwrapped after a pending code challenge is cleared. */
   private wrappedUvk: string | null = null;
-
-  /** Fixed page size - the paginator itself is only shown once the list exceeds this. */
-  readonly pageSize = 10;
 
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
@@ -61,10 +61,7 @@ export class SharedVaultView implements OnInit {
   readonly items = signal<DecryptedVaultItem[]>([]);
   readonly pageIndex = signal(0);
 
-  readonly pagedItems = computed(() => {
-    const start = this.pageIndex() * this.pageSize;
-    return this.items().slice(start, start + this.pageSize);
-  });
+  readonly pagedItems = this.pagination.slice(this.items, this.pageIndex);
 
   /** Set once the backend says a fresh emailed code is required to view this vault this session. */
   readonly challengeToken = signal<string | null>(null);
