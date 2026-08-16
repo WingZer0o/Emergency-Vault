@@ -180,3 +180,15 @@ export interface VaultItemViewDto {
   viewerEmail: string;
   viewedAt: string;
 }
+
+/** One prior version of an item, from just before an edit overwrote it. previousCiphertextBlob
+ * decrypts with whatever key decrypts the item's current ciphertextBlob - the item key never
+ * changes once assigned (see VaultItemDto.wrappedItemKey), so no extra key material is needed. */
+export interface VaultItemRevisionDto {
+  id: string;
+  previousCiphertextBlob: string;
+  changedByUserId: string;
+  changedByName: string;
+  changedByEmail: string;
+  changedAt: string;
+}

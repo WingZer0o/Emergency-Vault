@@ -374,6 +374,34 @@ namespace EmergencyVault.Infrastructure.Persistence.Migrations
                     b.ToTable("VaultItemAttachments", (string)null);
                 });
 
+            modelBuilder.Entity("EmergencyVault.Domain.Entities.VaultItemRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ChangedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PreviousCiphertextBlob")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("VaultItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByUserId");
+
+                    b.HasIndex("VaultItemId");
+
+                    b.ToTable("VaultItemRevisions", (string)null);
+                });
+
             modelBuilder.Entity("EmergencyVault.Domain.Entities.VaultItemView", b =>
                 {
                     b.Property<Guid>("Id")
@@ -683,6 +711,25 @@ namespace EmergencyVault.Infrastructure.Persistence.Migrations
                         .HasForeignKey("VaultItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("VaultItem");
+                });
+
+            modelBuilder.Entity("EmergencyVault.Domain.Entities.VaultItemRevision", b =>
+                {
+                    b.HasOne("EmergencyVault.Domain.Entities.ApplicationUser", "ChangedBy")
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EmergencyVault.Domain.Entities.VaultItem", "VaultItem")
+                        .WithMany()
+                        .HasForeignKey("VaultItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChangedBy");
 
                     b.Navigation("VaultItem");
                 });

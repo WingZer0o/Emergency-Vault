@@ -1,0 +1,45 @@
+<h2 mat-dialog-title>Revision history</h2>
+<mat-dialog-content>
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (errorMessage(); as message) {
+    <p class="error-text">{{ message }}</p>
+  } @else if (revisions().length === 0) {
+    <p>This item has no earlier versions.</p>
+  } @else {
+    <mat-accordion>
+      @for (revision of revisions(); track revision.id) {
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>{{ revision.changedByName }}</mat-panel-title>
+            <mat-panel-description>{{ revision.changedAt | date: 'medium' }}</mat-panel-description>
+          </mat-expansion-panel-header>
+
+          <p class="editor-email">{{ revision.changedByEmail }}</p>
+
+          @if (revision.payload; as payload) {
+            <dl class="revision-fields">
+              @for (field of payload.fields; track field.name) {
+                <div class="revision-field-row">
+                  <dt>{{ field.name }}</dt>
+                  <dd>
+                    <span>{{ revision.revealed ? field.value : '••••••••' }}</span>
+                  </dd>
+                </div>
+              }
+            </dl>
+            <button mat-button type="button" (click)="toggleReveal(revision.id)">
+              <mat-icon>{{ revision.revealed ? 'visibility_off' : 'visibility' }}</mat-icon>
+              {{ revision.revealed ? 'Hide values' : 'Reveal values' }}
+            </button>
+          } @else {
+            <p class="error-text">Could not decrypt this version.</p>
+          }
+        </mat-expansion-panel>
+      }
+    </mat-accordion>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+</mat-dialog-actions>

@@ -159,6 +159,26 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
             .ToListAsync(ct);
     }
 
+    public async Task RemoveAllItemRevisionsForItemAsync(Guid changedByUserId, CancellationToken ct)
+    {
+        await db.VaultItemRevisions.Where(r => r.ChangedByUserId == changedByUserId).ExecuteDeleteAsync(ct);
+    }
+
+    public async Task AddItemRevisionAsync(VaultItemRevision revision, CancellationToken ct)
+    {
+        await db.VaultItemRevisions.AddAsync(revision, ct);
+    }
+
+    public async Task<IReadOnlyList<VaultItemRevision>> GetRevisionsForItemAsync(Guid vaultItemId, CancellationToken ct)
+    {
+        return await db.VaultItemRevisions
+            .Where(r => r.VaultItemId == vaultItemId)
+            .OrderByDescending(r => r.ChangedAt)
+            .Take(50)
+            .Include(r => r.ChangedBy)
+            .ToListAsync(ct);
+    }
+
     public async Task SaveChangesAsync(CancellationToken ct)
     {
         await db.SaveChangesAsync(ct);

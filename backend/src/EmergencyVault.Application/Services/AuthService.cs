@@ -425,10 +425,14 @@ public class AuthService(
         }
 
         // Must run before UserManager.DeleteAsync: VaultProfile, owned VaultItems and granted
-        // VaultKeyShares all cascade-delete with the user, but VaultKeyShare.Holder is a Restrict
-        // FK (see AppDbContext), so any share this user holds - including their own self-share -
-        // would otherwise block the delete with a FK constraint violation.
+        // VaultKeyShares all cascade-delete with the user, but VaultKeyShare.Holder and
+        // VaultItemRevision.ChangedBy are both Restrict FKs (see AppDbContext), so any share this
+        // user holds - including their own self-share - or any revision they ever recorded (even
+        // on someone else's item, via edit access) would otherwise block the delete with a FK
+        // constraint violation. Sequential, not Task.WhenAll: both run ExecuteDeleteAsync against
+        // the same DbContext/connection, which isn't safe to do concurrently without MARS.
         await vaultRepository.DeleteHoldersSharesByIdAsync(userId, ct);
+        await vaultRepository.RemoveAllItemRevisionsForItemAsync(userId, ct);
 
         // Stripe has no idea the account is about to disappear - cancel any active/past-due
         // subscription first so the user doesn't keep getting billed after their account is gone.

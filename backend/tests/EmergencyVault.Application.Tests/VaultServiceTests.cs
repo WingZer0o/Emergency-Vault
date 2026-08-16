@@ -139,6 +139,57 @@ public class VaultServiceTests
     }
 
     [Fact]
+    public async Task UpdateItemAsync_RecordsRevision_WithPreviousCiphertextAndEditor()
+    {
+        var (repo, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        var created = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("original", "wrappedItemKey"), CancellationToken.None);
+
+        var result = await service.UpdateItemAsync(owner.Id, created.Data!.Id, new UpdateVaultItemRequest("updated", null), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var revision = Assert.Single(repo.ItemRevisions);
+        Assert.Equal(created.Data.Id, revision.VaultItemId);
+        Assert.Equal("original", revision.PreviousCiphertextBlob);
+        Assert.Equal(owner.Id, revision.ChangedByUserId);
+    }
+
+    [Fact]
+    public async Task GetItemRevisionsAsync_ReturnsHistory_ForOwner()
+    {
+        var (repo, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        var created = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("v1", "wrappedItemKey"), CancellationToken.None);
+        await service.UpdateItemAsync(owner.Id, created.Data!.Id, new UpdateVaultItemRequest("v2", null), CancellationToken.None);
+        // The fake repo doesn't simulate EF's Include(r => r.ChangedBy) - populate it directly, as a real query would.
+        Assert.Single(repo.ItemRevisions).ChangedBy = owner;
+
+        var result = await service.GetItemRevisionsAsync(owner.Id, created.Data.Id, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var revision = Assert.Single(result.Data!);
+        Assert.Equal("v1", revision.PreviousCiphertextBlob);
+        Assert.Equal(owner.Id, revision.ChangedByUserId);
+    }
+
+    [Fact]
+    public async Task GetItemRevisionsAsync_Fails_ForNonOwner()
+    {
+        var (_, users, service, _) = CreateService();
+        var owner = await CreateUserAsync(users, "owner@example.com");
+        var attacker = await CreateUserAsync(users, "attacker@example.com");
+        await SetUpVaultAsync(service, owner.Id);
+        var created = await service.CreateItemAsync(owner.Id, new CreateVaultItemRequest("v1", "wrappedItemKey"), CancellationToken.None);
+        await service.UpdateItemAsync(owner.Id, created.Data!.Id, new UpdateVaultItemRequest("v2", null), CancellationToken.None);
+
+        var result = await service.GetItemRevisionsAsync(attacker.Id, created.Data.Id, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
     public async Task DeleteItemAsync_Fails_ForNonOwner()
     {
         var (repo, _, service, _) = CreateService();

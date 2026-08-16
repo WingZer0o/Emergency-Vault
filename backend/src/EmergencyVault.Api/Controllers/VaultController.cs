@@ -105,6 +105,14 @@ public class VaultController(IVaultService vaultService) : ControllerBase
         return result.Succeeded ? Ok(result.Data) : NotFound(new { errors = result.Errors });
     }
 
+    [HttpGet("items/{id:guid}/revisions")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> GetItemRevisions(Guid id, CancellationToken ct)
+    {
+        var result = await vaultService.GetItemRevisionsAsync(User.GetUserId(), id, ct);
+        return result.Succeeded ? Ok(result.Data) : NotFound(new { errors = result.Errors });
+    }
+
     [HttpGet("items/{id:guid}/shares")]
     [Authorize(Roles = "User")]
     public async Task<IActionResult> GetItemShares(Guid id, CancellationToken ct)

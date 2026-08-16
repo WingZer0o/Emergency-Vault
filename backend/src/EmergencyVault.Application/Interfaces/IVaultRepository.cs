@@ -35,6 +35,9 @@ public interface IVaultRepository
 
     Task AddItemViewsAsync(IEnumerable<VaultItemView> views, CancellationToken ct);
     Task<IReadOnlyList<VaultItemView>> GetViewsForItemAsync(Guid vaultItemId, CancellationToken ct);
+    Task RemoveAllItemRevisionsForItemAsync(Guid changedByUserId, CancellationToken ct);
+    Task AddItemRevisionAsync(VaultItemRevision revision, CancellationToken ct);
+    Task<IReadOnlyList<VaultItemRevision>> GetRevisionsForItemAsync(Guid vaultItemId, CancellationToken ct);
 
     Task SaveChangesAsync(CancellationToken ct);
 }

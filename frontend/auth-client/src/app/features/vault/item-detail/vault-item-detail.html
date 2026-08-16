@@ -112,6 +112,10 @@
         <div class="actions">
           <a mat-button routerLink="/vault">Back</a>
           <div>
+            <button mat-button type="button" (click)="viewHistory()">
+              <mat-icon>history</mat-icon>
+              History
+            </button>
             <button mat-button type="button" color="warn" (click)="deleteItem()">Delete</button>
             <button mat-flat-button color="primary" type="button" (click)="startEditing()">Edit</button>
           </div>
