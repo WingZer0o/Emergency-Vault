@@ -58,48 +58,110 @@
   } @else if (item(); as currentItem) {
     <mat-card class="item-card">
       <mat-card-header>
-        <mat-card-title>{{ currentItem.label }}</mat-card-title>
+        <mat-card-title>{{ editing() ? 'Edit item' : currentItem.label }}</mat-card-title>
         <mat-card-subtitle>{{ currentItem.itemType }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <dl class="field-list">
-          @for (field of currentItem.fields; track field.name) {
-            <div class="field-row-view">
-              <dt>{{ field.name }}</dt>
-              <dd>
-                <span>{{ isRevealed(field.name) ? field.value : '••••••••' }}</span>
-                <button mat-icon-button type="button" (click)="toggleReveal(field.name)" aria-label="Toggle visibility">
-                  <mat-icon>{{ isRevealed(field.name) ? 'visibility_off' : 'visibility' }}</mat-icon>
-                </button>
-                <button mat-icon-button type="button" (click)="copyValue(field.value)" aria-label="Copy value">
-                  <mat-icon>content_copy</mat-icon>
-                </button>
-              </dd>
+        @if (!editing()) {
+          <dl class="field-list">
+            @for (field of currentItem.fields; track field.name) {
+              <div class="field-row-view">
+                <dt>{{ field.name }}</dt>
+                <dd>
+                  <span>{{ isRevealed(field.name) ? field.value : '••••••••' }}</span>
+                  <button mat-icon-button type="button" (click)="toggleReveal(field.name)" aria-label="Toggle visibility">
+                    <mat-icon>{{ isRevealed(field.name) ? 'visibility_off' : 'visibility' }}</mat-icon>
+                  </button>
+                  <button mat-icon-button type="button" (click)="copyValue(field.value)" aria-label="Copy value">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </dd>
+              </div>
+            }
+          </dl>
+
+          @if (attachments().length > 0) {
+            <div class="attachments">
+              <h3>Attachments</h3>
+              <ul class="attachment-list">
+                @for (attachment of attachments(); track attachment.id) {
+                  <li>
+                    <mat-icon>description</mat-icon>
+                    <span>{{ attachment.fileName }}</span>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="downloadAttachment(attachment)"
+                      [disabled]="downloadingId() === attachment.id"
+                      aria-label="Download file"
+                    >
+                      <mat-icon>download</mat-icon>
+                    </button>
+                  </li>
+                }
+              </ul>
             </div>
           }
-        </dl>
 
-        @if (attachments().length > 0) {
-          <div class="attachments">
-            <h3>Attachments</h3>
-            <ul class="attachment-list">
-              @for (attachment of attachments(); track attachment.id) {
-                <li>
-                  <mat-icon>description</mat-icon>
-                  <span>{{ attachment.fileName }}</span>
-                  <button
-                    mat-icon-button
-                    type="button"
-                    (click)="downloadAttachment(attachment)"
-                    [disabled]="downloadingId() === attachment.id"
-                    aria-label="Download file"
-                  >
-                    <mat-icon>download</mat-icon>
+          @if (canEdit()) {
+            <div class="actions">
+              <button mat-flat-button color="primary" type="button" (click)="startEditing()">Edit</button>
+            </div>
+          }
+        } @else {
+          <form [formGroup]="form" (ngSubmit)="save()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Label</mat-label>
+              <input matInput formControlName="label" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Type</mat-label>
+              <mat-select formControlName="itemType">
+                @for (type of itemTypes; track type) {
+                  <mat-option [value]="type">{{ type }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <div formArrayName="fields" class="fields">
+              @for (field of fields.controls; track $index) {
+                <div [formGroupName]="$index" class="field-row">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Field name</mat-label>
+                    <input matInput formControlName="name" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Value</mat-label>
+                    <input matInput formControlName="value" />
+                  </mat-form-field>
+                  <button mat-icon-button type="button" (click)="removeField($index)" aria-label="Remove field">
+                    <mat-icon>remove_circle_outline</mat-icon>
                   </button>
-                </li>
+                </div>
               }
-            </ul>
-          </div>
+            </div>
+
+            <button mat-stroked-button type="button" (click)="addField()">
+              <mat-icon>add</mat-icon>
+              Add field
+            </button>
+
+            @if (errorMessage(); as message) {
+              <p class="error-text">{{ message }}</p>
+            }
+
+            <div class="actions">
+              <button mat-button type="button" (click)="cancelEditing()">Cancel</button>
+              <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                @if (saving()) {
+                  <mat-progress-spinner diameter="20" mode="indeterminate" />
+                } @else {
+                  Save
+                }
+              </button>
+            </div>
+          </form>
         }
       </mat-card-content>
     </mat-card>
