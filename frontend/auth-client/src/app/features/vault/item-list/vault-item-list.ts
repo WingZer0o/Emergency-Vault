@@ -16,6 +16,7 @@ import { VaultSessionService } from '../../../core/services/vault-session.servic
 import { ItemViewersDialog } from '../../../shared/item-viewers-dialog/item-viewers-dialog';
 import { Paginator } from '../../../shared/paginator/paginator';
 import { extractErrorMessage } from '../../auth/auth-error.util';
+import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'app-vault-item-list',
@@ -31,7 +32,7 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
     Paginator,
   ],
   templateUrl: './vault-item-list.html',
-  styleUrl: './vault-item-list.scss',
+  styleUrls: ['./vault-item-list.scss'],
 })
 export class VaultItemList implements OnInit {
   private readonly vaultService = inject(VaultService);
@@ -53,9 +54,20 @@ export class VaultItemList implements OnInit {
 
   deleteItem(id: string, event: Event): void {
     event.stopPropagation();
-    this.vaultService.deleteItem(id).subscribe({
-      next: () => this.items.update((items) => items.filter((item) => item.id !== id)),
-      error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not delete item.')),
+    this.dialog.open(ConfirmDialog, {
+      data: {
+        title: 'Delete Item',
+        message: 'Are you sure you want to delete this item?',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+      },
+    }).afterClosed().subscribe((confirmed) => {
+      if (confirmed) {
+        this.vaultService.deleteItem(id).subscribe({
+          next: () => this.items.update((items) => items.filter((item) => item.id !== id)),
+          error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not delete item.')),
+        });
+      }
     });
   }
 

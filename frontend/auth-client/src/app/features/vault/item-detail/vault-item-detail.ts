@@ -30,6 +30,7 @@ import { ItemRevisionsDialog } from '../../../shared/item-revisions-dialog/item-
 import { ShareItemDialog, ShareItemDialogResult } from '../../../shared/share-item-dialog/share-item-dialog';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { ALLOWED_ATTACHMENT_EXTENSIONS, VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
+import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'app-vault-item-detail',
@@ -210,9 +211,20 @@ export class VaultItemDetail implements OnInit {
   }
 
   deleteItem(): void {
-    this.vaultService.deleteItem(this.itemId).subscribe({
-      next: () => this.router.navigateByUrl('/vault'),
-      error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not delete item.')),
+    this.dialog.open(ConfirmDialog, {
+      data: {
+        title: 'Delete Item',
+        message: 'Are you sure you want to delete this item?',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+      },
+    }).afterClosed().subscribe((confirmed: boolean) => {
+      if (confirmed) {
+        this.vaultService.deleteItem(this.itemId).subscribe({
+          next: () => this.router.navigateByUrl('/vault'),
+          error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not delete item.')),
+        });
+      }
     });
   }
 
