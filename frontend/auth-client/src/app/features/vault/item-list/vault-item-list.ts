@@ -17,6 +17,7 @@ import { ItemViewersDialog } from '../../../shared/item-viewers-dialog/item-view
 import { Paginator } from '../../../shared/paginator/paginator';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { MatRippleModule } from '@angular/material/core';
 
 @Component({
   selector: 'app-vault-item-list',
@@ -30,6 +31,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
     MatListModule,
     MatProgressSpinnerModule,
     Paginator,
+    MatRippleModule
   ],
   templateUrl: './vault-item-list.html',
   styleUrls: ['./vault-item-list.scss'],
