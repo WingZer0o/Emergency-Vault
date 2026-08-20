@@ -5,5 +5,10 @@
   },
   "mimeTypes": {
     ".json": "application/json"
+  },
+  "networking": {
+    "allowedIpRanges": [
+      "68.202.234.93/32"
+    ]
   }
 }
