@@ -8,7 +8,7 @@ Run from `frontend/auth-client/`:
 
 ```bash
 npm install
-npm start              # ng serve, http://localhost:4200 — expects the API at localhost:8080 (see environment.development.ts)
+npm start              # ng serve, http://localhost:4200 — proxies /api to the backend (see proxy.conf.mjs; defaults to localhost:8080, or API_PROXY_TARGET if set)
 npm run build           # ng build -> dist/auth-client
 npm test                 # ng test, runs Vitest
 ```
@@ -28,6 +28,6 @@ Angular 22, standalone components (no `NgModule`s) with signals for state, Angul
   - `interceptors/refresh.interceptor.ts` — on a 401 from any endpoint other than login/register/refresh themselves, calls `AuthService.refresh()` once and retries the original request; does not retry a second time on repeat failure.
   - `guards/auth.guard.ts` — redirects to `/login` if not authenticated. `guards/role.guard.ts` — a factory (`roleGuard(...roles)`) for role-gated routes; currently defined but not wired into `app.routes.ts` (no admin-only screen exists yet).
 - **`features/`** — route-level components, one folder per screen (`auth/login`, `auth/register`, `auth/forgot-password`, `auth/reset-password`, `auth/confirm-email`, `dashboard`). All routes are lazy-loaded via `loadComponent` in `app.routes.ts`. Only `/profile` is guarded.
-- **`environments/`** — `apiUrl` differs by build: `http://localhost:8080/api` in dev (cross-origin from `:4200`, requires the backend's `Cors:AllowedOrigins` to include the dev server origin), `/api` in production (nginx reverse-proxies same-origin, avoiding CORS/cross-site-cookie issues entirely).
+- **`environments/`** — `apiUrl` is `/api` in every build. In dev, `ng serve`'s dev-server proxy (`proxy.conf.json`) forwards `/api` to the backend on `:8080`; in Docker/production, nginx (or the SWA-linked backend) reverse-proxies it. All same-origin, avoiding CORS/cross-site-cookie issues entirely.
 
 This app is purely a client for the ASP.NET Core API in `../backend` — see `../backend/CLAUDE.md` and the root `README.md` for the auth/token design it depends on (ES512 access tokens, httpOnly refresh cookie scoped to `/api/auth`, email-code two-factor flow).

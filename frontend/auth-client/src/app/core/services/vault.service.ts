@@ -33,7 +33,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class VaultService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiUrl}/vault`;
+  private readonly baseUrl = `/api/vault`;
 
   setup(request: VaultSetupRequest): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/setup`, request);

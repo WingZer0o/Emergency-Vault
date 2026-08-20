@@ -9,7 +9,7 @@ import { AuthService } from '../services/auth.service';
  * (cookies) so the httpOnly refresh-token cookie flows on /api/auth/* calls.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  if (!req.url.startsWith(environment.apiUrl)) {
+  if (!req.url.includes('/api/')) {
     return next(req);
   }
 

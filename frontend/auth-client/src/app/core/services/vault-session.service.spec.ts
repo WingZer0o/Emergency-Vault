@@ -16,7 +16,7 @@ import {
 import { VAULT_IDLE_TIMEOUT_MS, VaultSessionService } from './vault-session.service';
 
 const KDF_ITERATIONS = 200_000;
-const baseUrl = `${environment.apiUrl}/vault`;
+const baseUrl = `/api/vault`;
 
 /**
  * Unlike the unlock flows, setupVault does real RSA-3072 key generation before its HTTP call, so
