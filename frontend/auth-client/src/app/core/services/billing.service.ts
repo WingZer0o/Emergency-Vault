@@ -14,8 +14,8 @@ import {
 @Injectable({ providedIn: 'root' })
 export class BillingService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiUrl}/billing`;
-  private readonly adminBaseUrl = `${environment.apiUrl}/admin/billing`;
+  private readonly baseUrl = `/api/billing`;
+  private readonly adminBaseUrl = `/api/admin/billing`;
 
   getStatus(): Observable<BillingStatus> {
     return this.http.get<BillingStatus>(`${this.baseUrl}/status`);

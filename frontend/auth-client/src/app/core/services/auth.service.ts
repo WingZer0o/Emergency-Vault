@@ -22,7 +22,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiUrl}/auth`;
+  private readonly baseUrl = `/api/auth`;
 
   private readonly accessTokenSig = signal<string | null>(null);
   private readonly currentUserSig = signal<UserProfile | null>(null);

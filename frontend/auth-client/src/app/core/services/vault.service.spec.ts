@@ -8,7 +8,7 @@ import { VaultService } from './vault.service';
 describe('VaultService', () => {
   let service: VaultService;
   let httpMock: HttpTestingController;
-  const baseUrl = `${environment.apiUrl}/vault`;
+  const baseUrl = `/api/vault`;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
