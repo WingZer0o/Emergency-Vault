@@ -47,20 +47,23 @@ builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServe
 builder.Services.AddDataProtection()
     .SetApplicationName("EmergencyVault");
 
-// Kestrel always sees the connection from whichever reverse proxy sits directly in front of it
-// (nginx in the Docker prod overlay, Azure Container Apps' Envoy-based ingress in prod) - never
-// the browser. Both proxies already set X-Forwarded-For/-Proto; this rewrites
-// HttpContext.Connection.RemoteIpAddress from that header so AuthController sees the real client
-// IP. KnownNetworks/KnownProxies are cleared because that one hop's IP isn't a fixed, known
-// value (it varies per container/ACA revision) - safe only because Kestrel itself is never
-// reachable except through that proxy (nginx is the only published port in the Docker prod
-// overlay; ACA's ingress is the sole entry point to the Container App).
+// Kestrel never sees the browser directly. In the Docker prod overlay there's one hop (nginx).
+// In Azure prod there are now two: the Static Web App edge (linked backend) fronting Container
+// Apps' Envoy-based ingress. Each hop appends its peer's IP to X-Forwarded-For, so by the time it
+// reaches Kestrel the header is "<real client IP>, <SWA edge IP>" - this rewrites
+// HttpContext.Connection.RemoteIpAddress from that header so AuthController and the rate limiter
+// below see the real client IP rather than the SWA edge's. KnownNetworks/KnownProxies are cleared
+// because those hops' IPs aren't fixed, known values (SWA's edge IP and the ACA revision's IP both
+// vary) - safe only because Kestrel itself is never reachable except through that exact proxy
+// chain (nginx is the only published port in the Docker prod overlay; the Container App's ingress
+// must be locked down to only accept traffic from the linked Static Web App, otherwise anyone can
+// bypass SWA and spoof this header directly).
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
-    options.ForwardLimit = 1;
+    options.ForwardLimit = 2;
 });
 
 builder.Services.AddControllers();
