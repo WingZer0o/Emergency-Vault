@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using EmergencyVault.Application.Interfaces;
+using OtpNet;
 
 namespace EmergencyVault.Application.Tests.Fakes;
 
@@ -13,9 +14,15 @@ public class FakeHotpService : IHotpService
 {
     public string GenerateCode(byte[] secret, long counter, int digits = 6)
     {
-        var seed = Encoding.UTF8.GetBytes(Convert.ToBase64String(secret) + ":" + counter);
-        var hash = SHA256.HashData(seed);
-        var value = BitConverter.ToUInt32(hash, 0) % (uint)Math.Pow(10, digits);
-        return value.ToString().PadLeft(digits, '0');
+        var hotp = new Hotp(secret, hotpSize: digits, mode: OtpHashMode.Sha512);
+        var code = hotp.ComputeHOTP(counter);
+        return code;
     }
+
+    public bool VerifyCode(string secret, string hotp, long counter, int digits = 6)
+    {
+        var hotpInstance = new Hotp(Convert.FromBase64String(secret), hotpSize: digits, mode: OtpHashMode.Sha512);
+        return hotpInstance.VerifyHotp(hotp, counter);
+    }
+
 }
