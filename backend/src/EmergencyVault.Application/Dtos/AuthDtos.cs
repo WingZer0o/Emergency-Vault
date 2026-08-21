@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using EmergencyVault.Domain.Enums;
 
 namespace EmergencyVault.Application.Dtos;
 
@@ -41,11 +42,17 @@ public record AuthResult(
     DateTimeOffset RefreshTokenExpiresAt,
     UserProfileDto User);
 
-/// <summary>Result of a login attempt: either a completed sign-in, or a pending email-2FA challenge.</summary>
-public record LoginResult(bool RequiresTwoFactor, string? TwoFactorToken, AuthResult? Auth);
+/// <summary>Result of a login attempt: either a completed sign-in, or a pending 2FA challenge.</summary>
+public record LoginResult(bool RequiresTwoFactor, string? TwoFactorToken, TwoFactorMethod? TwoFactorMethod, AuthResult? Auth);
 
 public record VerifyTwoFactorRequest(
     [Required] string TwoFactorToken,
     [Required, StringLength(6, MinimumLength = 6)] string Code);
 
 public record ResendTwoFactorRequest([Required] string TwoFactorToken);
+
+public record TwoFactorStatusResult(bool Enabled, TwoFactorMethod Method);
+
+public record TotpEnrollmentResult(string Secret, string QrCodePng);
+
+public record ConfirmTotpRequest([Required, StringLength(6, MinimumLength = 6)] string Code);

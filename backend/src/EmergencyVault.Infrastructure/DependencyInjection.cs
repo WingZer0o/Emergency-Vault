@@ -80,6 +80,8 @@ public static class DependencyInjection
         services.AddScoped<IStripeGateway, StripeGateway>();
         services.AddSingleton<IRefreshTokenCache, RedisRefreshTokenCache>();
         services.AddScoped<IEmailSender, ResendEmailSender>();
+        services.AddScoped<IHotpService, HotpService>();
+        services.AddScoped<ITotpService, TotpService>();
         services.AddScoped<EmailJobs>();
 
         // Job queue lives in the same SQL Server database as everything else (Hangfire creates
@@ -101,8 +103,6 @@ public static class DependencyInjection
         // ITokenService depends on the ECDsa signing key singleton, registered by the Api
         // project in Program.cs (loaded once there and shared with JWT Bearer validation).
         services.AddSingleton<ITokenService, TokenService>();
-
-        services.AddSingleton<IHotpService, HotpService>();
         services.AddSingleton<ITwoFactorChallengeCache, RedisTwoFactorChallengeCache>();
         services.AddSingleton<ISharedVaultAccessChallengeCache, RedisSharedVaultAccessChallengeCache>();
         services.AddSingleton<ISharedVaultAccessGrantCache, RedisSharedVaultAccessGrantCache>();

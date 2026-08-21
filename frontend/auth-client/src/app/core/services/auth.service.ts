@@ -10,6 +10,8 @@ import {
   LoginResponse,
   RegisterRequest,
   ResetPasswordRequest,
+  TotpEnrollment,
+  TwoFactorStatus,
   UserProfile,
   VerifyTwoFactorRequest,
 } from '../models/auth.models';
@@ -62,8 +64,8 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${this.baseUrl}/login/two-factor/resend`, { twoFactorToken });
   }
 
-  getTwoFactorStatus(): Observable<{ enabled: boolean }> {
-    return this.http.get<{ enabled: boolean }>(`${this.baseUrl}/two-factor/status`);
+  getTwoFactorStatus(): Observable<TwoFactorStatus> {
+    return this.http.get<TwoFactorStatus>(`${this.baseUrl}/two-factor/status`);
   }
 
   enableTwoFactor(): Observable<{ message: string }> {
@@ -72,6 +74,14 @@ export class AuthService {
 
   disableTwoFactor(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/two-factor/disable`, {});
+  }
+
+  startTotpEnrollment(): Observable<TotpEnrollment> {
+    return this.http.post<TotpEnrollment>(`${this.baseUrl}/two-factor/totp/setup`, {});
+  }
+
+  confirmTotpEnrollment(code: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/two-factor/totp/confirm`, { code });
   }
 
   refresh(): Observable<AuthResponse> {
