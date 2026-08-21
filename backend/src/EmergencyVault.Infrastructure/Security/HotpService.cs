@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using EmergencyVault.Application.Interfaces;
+using OtpNet;
 
 namespace EmergencyVault.Infrastructure.Security;
 
-/// <summary>
-/// RFC 4226 HOTP: HMAC-SHA1 over the big-endian counter, dynamically truncated to a
+/// RFC 4226 HOTP: HMAC-SHA512 over the big-endian counter, dynamically truncated to a
 /// Digits-length decimal code. Deterministic in (secret, counter), so the caller is
 /// responsible for never reusing a counter value once its code has been issued.
 /// </summary>
@@ -12,21 +12,14 @@ public class HotpService : IHotpService
 {
     public string GenerateCode(byte[] secret, long counter, int digits = 6)
     {
-        var counterBytes = BitConverter.GetBytes(counter);
-        if (BitConverter.IsLittleEndian)
-        {
-            Array.Reverse(counterBytes);
-        }
+        var hotp = new Hotp(secret, hotpSize: digits, mode: OtpHashMode.Sha512);
+        var otp = hotp.ComputeHOTP(counter);
+        return otp;
+    }
 
-        var hash = HMACSHA1.HashData(secret, counterBytes);
-
-        var offset = hash[^1] & 0x0F;
-        var binaryCode = ((hash[offset] & 0x7F) << 24)
-            | ((hash[offset + 1] & 0xFF) << 16)
-            | ((hash[offset + 2] & 0xFF) << 8)
-            | (hash[offset + 3] & 0xFF);
-
-        var otp = binaryCode % (int)Math.Pow(10, digits);
-        return otp.ToString().PadLeft(digits, '0');
+    public bool VerifyCode(string secret, string hotp, long counter, int digits = 6)
+    {
+        var hotpInstance = new Hotp(Convert.FromBase64String(secret), hotpSize: digits, mode: OtpHashMode.Sha512);
+        return hotpInstance.VerifyHotp(hotp, counter);
     }
 }
