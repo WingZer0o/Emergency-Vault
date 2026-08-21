@@ -45,7 +45,13 @@
     } @else {
       <mat-card-header>
         <mat-card-title>Enter verification code</mat-card-title>
-        <mat-card-subtitle>We emailed you a 6-digit code.</mat-card-subtitle>
+        <mat-card-subtitle>
+          @if (twoFactorMethod() === 'Totp') {
+            Enter the 6-digit code from your authenticator app.
+          } @else {
+            We emailed you a 6-digit code.
+          }
+        </mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
         <form [formGroup]="codeForm" (ngSubmit)="submitCode()">
@@ -82,7 +88,9 @@
           </div>
         </form>
 
-        <p class="switch-link"><a (click)="resendCode()">Resend code</a></p>
+        @if (twoFactorMethod() === 'Email') {
+          <p class="switch-link"><a (click)="resendCode()">Resend code</a></p>
+        }
       </mat-card-content>
     }
   </mat-card>

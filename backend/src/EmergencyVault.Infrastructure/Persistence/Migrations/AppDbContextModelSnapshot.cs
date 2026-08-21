@@ -107,11 +107,17 @@ namespace EmergencyVault.Infrastructure.Persistence.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("TotpSecret")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<long>("TwoFactorCounter")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
+
+                    b.Property<int>("TwoFactorMethod")
+                        .HasColumnType("int");
 
                     b.Property<string>("TwoFactorSecret")
                         .HasColumnType("nvarchar(max)");

@@ -15,8 +15,10 @@ public interface IAuthService
     Task<ServiceResult> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct);
     Task<ServiceResult> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct);
     Task<UserProfileDto?> GetProfileAsync(Guid userId, CancellationToken ct);
-    Task<bool> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct);
+    Task<TwoFactorStatusResult> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct);
     Task<ServiceResult> EnableTwoFactorAsync(Guid userId, CancellationToken ct);
     Task<ServiceResult> DisableTwoFactorAsync(Guid userId, CancellationToken ct);
+    Task<ServiceResult<TotpEnrollmentResult>> StartTotpEnrollmentAsync(Guid userId, CancellationToken ct);
+    Task<ServiceResult> ConfirmTotpEnrollmentAsync(Guid userId, string code, CancellationToken ct);
     Task<ServiceResult> DeleteAccountAsync(Guid userId, CancellationToken ct);
 }

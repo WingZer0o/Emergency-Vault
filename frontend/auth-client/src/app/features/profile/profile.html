@@ -21,18 +21,69 @@
       @if (twoFactorLoading()) {
         <mat-progress-spinner diameter="28" mode="indeterminate" />
       } @else {
-        <mat-slide-toggle
-          [checked]="twoFactorEnabled()"
+        <mat-radio-group
+          [value]="twoFactorMethod()"
           [disabled]="twoFactorSaving()"
-          (change)="onTwoFactorToggle($event)"
+          (change)="onTwoFactorMethodChange($event)"
         >
-          Email two-factor authentication
-        </mat-slide-toggle>
+          <mat-radio-button value="None">Off</mat-radio-button>
+          <mat-radio-button value="Email">Email code</mat-radio-button>
+          <mat-radio-button value="Totp">Authenticator app</mat-radio-button>
+        </mat-radio-group>
         <p class="hint-text">
-          When enabled, we'll email you a verification code each time you sign in.
+          Choose one way to verify it's you when you sign in: an emailed code, or a code from an
+          authenticator app like Microsoft Authenticator or Google Authenticator.
         </p>
         @if (twoFactorError(); as message) {
           <p class="error-text">{{ message }}</p>
+        }
+
+        @if (totpEnrollmentActive()) {
+          <div class="totp-setup">
+            <p class="hint-text">Scan this QR code with your authenticator app:</p>
+            @if (totpQrCode(); as qrCode) {
+              <img
+                class="totp-qr"
+                [src]="'data:image/png;base64,' + qrCode"
+                alt="Scan with your authenticator app"
+                width="200"
+                height="200"
+              />
+            }
+            @if (totpSecret(); as secret) {
+              <p class="hint-text">Or enter this code manually: <code>{{ secret }}</code></p>
+            }
+
+            <form [formGroup]="totpCodeForm" (ngSubmit)="confirmTotpEnrollment()">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Code from your app</mat-label>
+                <input
+                  matInput
+                  type="text"
+                  inputmode="numeric"
+                  formControlName="code"
+                  autocomplete="one-time-code"
+                  maxlength="6"
+                />
+                @if (totpCodeForm.controls.code.hasError('required')) {
+                  <mat-error>Code is required.</mat-error>
+                } @else if (totpCodeForm.controls.code.hasError('pattern')) {
+                  <mat-error>Enter the 6-digit code.</mat-error>
+                }
+              </mat-form-field>
+
+              @if (totpError(); as message) {
+                <p class="error-text">{{ message }}</p>
+              }
+
+              <div class="actions">
+                <a (click)="cancelTotpEnrollment()">Cancel</a>
+                <button mat-flat-button color="primary" type="submit" [disabled]="twoFactorSaving()">
+                  Confirm
+                </button>
+              </div>
+            </form>
+          </div>
         }
       }
     </mat-card-content>
