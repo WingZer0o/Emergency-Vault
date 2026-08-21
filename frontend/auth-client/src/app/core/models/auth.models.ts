@@ -15,9 +15,12 @@ export interface AuthResponse {
   user: UserProfile;
 }
 
+export type TwoFactorMethodName = 'None' | 'Email' | 'Totp';
+
 export interface TwoFactorChallengeResponse {
   requiresTwoFactor: true;
   twoFactorToken: string;
+  method: TwoFactorMethodName;
 }
 
 export type LoginResponse = AuthResponse | TwoFactorChallengeResponse;
@@ -25,6 +28,16 @@ export type LoginResponse = AuthResponse | TwoFactorChallengeResponse;
 export interface VerifyTwoFactorRequest {
   twoFactorToken: string;
   code: string;
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  method: TwoFactorMethodName;
+}
+
+export interface TotpEnrollment {
+  secret: string;
+  qrCode: string;
 }
 
 export interface RegisterRequest {

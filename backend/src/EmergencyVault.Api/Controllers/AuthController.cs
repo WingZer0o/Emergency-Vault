@@ -33,7 +33,7 @@ public class AuthController(IAuthService authService) : ControllerBase
 
         if (result.Data.RequiresTwoFactor)
         {
-            return Ok(new { requiresTwoFactor = true, twoFactorToken = result.Data.TwoFactorToken });
+            return Ok(new { requiresTwoFactor = true, twoFactorToken = result.Data.TwoFactorToken, method = result.Data.TwoFactorMethod!.Value.ToString() });
         }
 
         SetRefreshCookie(result.Data.Auth!.RefreshToken, result.Data.Auth.RefreshTokenExpiresAt);
@@ -160,8 +160,8 @@ public class AuthController(IAuthService authService) : ControllerBase
     [Authorize(Roles="User")]
     public async Task<IActionResult> TwoFactorStatus(CancellationToken ct)
     {
-        var enabled = await authService.GetTwoFactorStatusAsync(User.GetUserId(), ct);
-        return Ok(new { enabled });
+        var status = await authService.GetTwoFactorStatusAsync(User.GetUserId(), ct);
+        return Ok(new { enabled = status.Enabled, method = status.Method.ToString() });
     }
 
     [HttpPost("two-factor/enable")]
@@ -181,6 +181,26 @@ public class AuthController(IAuthService authService) : ControllerBase
         var result = await authService.DisableTwoFactorAsync(User.GetUserId(), ct);
         return result.Succeeded
             ? Ok(new { message = "Two-factor authentication disabled." })
+            : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("two-factor/totp/setup")]
+    [Authorize(Roles="User")]
+    public async Task<IActionResult> SetupTotp(CancellationToken ct)
+    {
+        var result = await authService.StartTotpEnrollmentAsync(User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(new { secret = result.Data!.Secret, qrCode = result.Data.QrCodePng })
+            : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("two-factor/totp/confirm")]
+    [Authorize(Roles="User")]
+    public async Task<IActionResult> ConfirmTotp(ConfirmTotpRequest request, CancellationToken ct)
+    {
+        var result = await authService.ConfirmTotpEnrollmentAsync(User.GetUserId(), request.Code, ct);
+        return result.Succeeded
+            ? Ok(new { message = "Authenticator app enabled." })
             : BadRequest(new { errors = result.Errors });
     }
 

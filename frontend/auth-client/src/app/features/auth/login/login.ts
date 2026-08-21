@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { TwoFactorMethodName } from '../../../core/models/auth.models';
 import { extractErrorMessage } from '../auth-error.util';
 
 @Component({
@@ -34,6 +35,7 @@ export class Login {
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly twoFactorToken = signal<string | null>(null);
+  readonly twoFactorMethod = signal<TwoFactorMethodName | null>(null);
 
   /** Captured at submit() so a silent vault unlock attempt can reuse it after a 2FA challenge, without prompting for the password twice. */
   private pendingPassword = '';
@@ -62,6 +64,7 @@ export class Login {
         this.loading.set(false);
         if (response.requiresTwoFactor) {
           this.twoFactorToken.set(response.twoFactorToken);
+          this.twoFactorMethod.set(response.method);
         } else {
           this.tryUnlockVault();
           this.router.navigateByUrl('/profile');
@@ -122,6 +125,7 @@ export class Login {
 
   cancelTwoFactor(): void {
     this.twoFactorToken.set(null);
+    this.twoFactorMethod.set(null);
     this.codeForm.reset();
     this.errorMessage.set(null);
   }

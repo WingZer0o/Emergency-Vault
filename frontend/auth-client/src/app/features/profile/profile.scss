@@ -6,3 +6,37 @@
   max-width: 720px;
   margin: 0 auto;
 }
+
+.security-card mat-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.totp-setup {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mat-sys-outline-variant, rgba(0, 0, 0, 0.12));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.totp-setup form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.totp-setup .actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.totp-qr {
+  border-radius: 4px;
+}
