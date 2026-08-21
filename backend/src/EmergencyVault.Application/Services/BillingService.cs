@@ -194,6 +194,7 @@ public class BillingService(
             && subscription.Status is SubscriptionStatus.Active or SubscriptionStatus.PastDue)
         {
             await stripeGateway.CancelSubscriptionAsync(subscription.StripeSubscriptionId, ct);
+            
             subscription.Status = SubscriptionStatus.Canceled;
         }
     }
