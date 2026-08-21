@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using EmergencyVault.Api.Authorization;
 using EmergencyVault.Application;
@@ -12,7 +11,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
 using Stripe;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -108,40 +106,13 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "EmergencyVault API", Version = "v1" });
-
-    var bearerScheme = new OpenApiSecurityScheme
-    {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Paste the access token returned by /api/auth/login.",
-    };
-    options.AddSecurityDefinition("Bearer", bearerScheme);
-    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
-    {
-        { new OpenApiSecuritySchemeReference("Bearer", null, null), [] }
-    });
-});
 
 var app = builder.Build();
 
 // Must run before anything that reads HttpContext.Connection.RemoteIpAddress or the request
 // scheme (CORS, auth, controllers) - it rewrites both from the forwarded headers set above.
 app.UseForwardedHeaders();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
 app.UseExceptionHandler();
-
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
