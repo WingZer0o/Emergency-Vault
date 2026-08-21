@@ -49,6 +49,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/billing/billing').then((m) => m.Billing),
   },
   {
+    path: 'password-generator',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/password-generator/password-generator').then((m) => m.PasswordGenerator),
+  },
+  {
     path: 'admin',
     canActivate: [authGuard, roleGuard('Admin')],
     loadComponent: () => import('./features/admin/admin-home/admin-home').then((m) => m.AdminHome),
