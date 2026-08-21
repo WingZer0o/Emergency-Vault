@@ -4,4 +4,5 @@ namespace EmergencyVault.Application.Interfaces;
 public interface IHotpService
 {
     string GenerateCode(byte[] secret, long counter, int digits = 6);
+    bool VerifyCode(string secret, string hotp, long counter, int digits = 6);
 }

@@ -132,11 +132,10 @@ public class AuthService(
             await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
             return ServiceResult<AuthResult>.Failure("Account is temporarily locked due to repeated failed attempts.");
         }
-
+        
         var secret = Convert.FromBase64String(user.TwoFactorSecret);
-        var expectedCode = hotpService.GenerateCode(secret, challenge.Counter, _two2FACodesOptions.CodeLength);
 
-        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(code), Encoding.UTF8.GetBytes(expectedCode)))
+        if (!hotpService.VerifyCode(user.TwoFactorSecret, code, user.TwoFactorCounter))
         {
             await userManager.AccessFailedAsync(user);
             if (await userManager.IsLockedOutAsync(user))
