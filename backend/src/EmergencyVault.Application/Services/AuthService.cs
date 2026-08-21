@@ -4,6 +4,7 @@ using EmergencyVault.Application.Dtos;
 using EmergencyVault.Application.Interfaces;
 using EmergencyVault.Application.Options;
 using EmergencyVault.Domain.Entities;
+using EmergencyVault.Domain.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,7 @@ public class AuthService(
     SignInManager<ApplicationUser> signInManager,
     ITokenService tokenService,
     IHotpService hotpService,
+    ITotpService totpService,
     ITwoFactorChallengeCache twoFactorChallengeCache,
     IRefreshTokenRepository refreshTokenRepository,
     IRefreshTokenCache refreshTokenCache,
@@ -97,19 +99,29 @@ public class AuthService(
             return ServiceResult<LoginResult>.Failure(message);
         }
 
-        if (user.TwoFactorEnabled && !string.IsNullOrEmpty(user.TwoFactorSecret))
+        if (user.TwoFactorMethod == TwoFactorMethod.Email && !string.IsNullOrEmpty(user.TwoFactorSecret))
         {
             var counter = await IssueTwoFactorCodeAsync(user, ct);
             var challengeToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-            await twoFactorChallengeCache.SetAsync(challengeToken, new TwoFactorChallenge(user.Id, counter, 0), _two2FACodesOptions.TwoFactorChallengeTtl, ct);
+            await twoFactorChallengeCache.SetAsync(
+                challengeToken, new TwoFactorChallenge(user.Id, TwoFactorChallengeMethod.Email, counter, 0), _two2FACodesOptions.TwoFactorChallengeTtl, ct);
 
-            return ServiceResult<LoginResult>.Success(new LoginResult(true, challengeToken, null));
+            return ServiceResult<LoginResult>.Success(new LoginResult(true, challengeToken, TwoFactorMethod.Email, null));
+        }
+
+        if (user.TwoFactorMethod == TwoFactorMethod.Totp && !string.IsNullOrEmpty(user.TotpSecret))
+        {
+            var challengeToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            await twoFactorChallengeCache.SetAsync(
+                challengeToken, new TwoFactorChallenge(user.Id, TwoFactorChallengeMethod.Totp, 0, 0), _two2FACodesOptions.TwoFactorChallengeTtl, ct);
+
+            return ServiceResult<LoginResult>.Success(new LoginResult(true, challengeToken, TwoFactorMethod.Totp, null));
         }
 
         await NotifyIfNewIpAsync(user, ipAddress, ct);
 
         var result = await IssueTokenPairAsync(user, ipAddress, ct);
-        return ServiceResult<LoginResult>.Success(new LoginResult(false, null, result));
+        return ServiceResult<LoginResult>.Success(new LoginResult(false, null, null, result));
     }
 
     public async Task<ServiceResult<AuthResult>> VerifyTwoFactorAsync(string challengeToken, string code, string? ipAddress, CancellationToken ct)
@@ -121,7 +133,10 @@ public class AuthService(
         }
 
         var user = await userManager.FindByIdAsync(challenge.UserId.ToString());
-        if (user is null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
+        var hasMatchingSecret = challenge.Method == TwoFactorChallengeMethod.Email
+            ? !string.IsNullOrEmpty(user?.TwoFactorSecret)
+            : !string.IsNullOrEmpty(user?.TotpSecret);
+        if (user is null || user.TwoFactorMethod == TwoFactorMethod.None || !hasMatchingSecret)
         {
             await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
             return ServiceResult<AuthResult>.Failure("Invalid or expired code. Please log in again.");
@@ -132,10 +147,12 @@ public class AuthService(
             await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
             return ServiceResult<AuthResult>.Failure("Account is temporarily locked due to repeated failed attempts.");
         }
-        
-        var secret = Convert.FromBase64String(user.TwoFactorSecret);
 
-        if (!hotpService.VerifyCode(user.TwoFactorSecret, code, user.TwoFactorCounter))
+        var codeIsValid = challenge.Method == TwoFactorChallengeMethod.Email
+            ? hotpService.VerifyCode(user.TwoFactorSecret!, code, user.TwoFactorCounter)
+            : totpService.VerifyCode(user.TotpSecret!, code);
+
+        if (!codeIsValid)
         {
             await userManager.AccessFailedAsync(user);
             if (await userManager.IsLockedOutAsync(user))
@@ -174,8 +191,13 @@ public class AuthService(
             return ServiceResult.Failure("Invalid or expired code. Please log in again.");
         }
 
+        if (challenge.Method != TwoFactorChallengeMethod.Email)
+        {
+            return ServiceResult.Failure("There's no code to resend - enter the code from your authenticator app.");
+        }
+
         var user = await userManager.FindByIdAsync(challenge.UserId.ToString());
-        if (user is null || !user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecret))
+        if (user is null || user.TwoFactorMethod != TwoFactorMethod.Email || string.IsNullOrEmpty(user.TwoFactorSecret))
         {
             await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
             return ServiceResult.Failure("Invalid or expired code. Please log in again.");
@@ -187,10 +209,11 @@ public class AuthService(
         return ServiceResult.Success();
     }
 
-    public async Task<bool> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct)
+    public async Task<TwoFactorStatusResult> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());
-        return user?.TwoFactorEnabled ?? false;
+        var method = user?.TwoFactorMethod ?? TwoFactorMethod.None;
+        return new TwoFactorStatusResult(method != TwoFactorMethod.None, method);
     }
 
     public async Task<ServiceResult> EnableTwoFactorAsync(Guid userId, CancellationToken ct)
@@ -207,6 +230,10 @@ public class AuthService(
             user.TwoFactorCounter = 0;
         }
 
+        // Mutual exclusivity: switching to email clears any authenticator-app enrollment.
+        user.TotpSecret = null;
+        user.TwoFactorMethod = TwoFactorMethod.Email;
+
         var result = await userManager.SetTwoFactorEnabledAsync(user, true);
         return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
     }
@@ -221,8 +248,52 @@ public class AuthService(
 
         user.TwoFactorSecret = null;
         user.TwoFactorCounter = 0;
+        user.TotpSecret = null;
+        user.TwoFactorMethod = TwoFactorMethod.None;
 
         var result = await userManager.SetTwoFactorEnabledAsync(user, false);
+        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<ServiceResult<TotpEnrollmentResult>> StartTotpEnrollmentAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ServiceResult<TotpEnrollmentResult>.Failure("User not found.");
+        }
+
+        // Pending secret only - TwoFactorMethod isn't flipped until ConfirmTotpEnrollmentAsync, so
+        // whatever method the user currently has (if any) keeps working until they finish setup.
+        var secret = totpService.GenerateSecretKey();
+        user.TotpSecret = secret;
+        await userManager.UpdateAsync(user);
+
+        var otpUri = totpService.GenerateQrCodeUri(secret, user.Email!);
+        var qrCodePng = totpService.GenerateQrCodePng(otpUri);
+
+        return ServiceResult<TotpEnrollmentResult>.Success(new TotpEnrollmentResult(secret, qrCodePng));
+    }
+
+    public async Task<ServiceResult> ConfirmTotpEnrollmentAsync(Guid userId, string code, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null || string.IsNullOrEmpty(user.TotpSecret))
+        {
+            return ServiceResult.Failure("No pending authenticator app enrollment. Start setup again.");
+        }
+
+        if (!totpService.VerifyCode(user.TotpSecret, code))
+        {
+            return ServiceResult.Failure("Incorrect code. Please try again.");
+        }
+
+        // Mutual exclusivity: activating the authenticator app clears the email-HOTP secret.
+        user.TwoFactorSecret = null;
+        user.TwoFactorCounter = 0;
+        user.TwoFactorMethod = TwoFactorMethod.Totp;
+
+        var result = await userManager.SetTwoFactorEnabledAsync(user, true);
         return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
     }
 
