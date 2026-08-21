@@ -70,6 +70,7 @@ public static class DependencyInjection
             .AddSignInManager<SignInManager<ApplicationUser>>()
             .AddDefaultTokenProviders();
 
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUserFailedLoginRepository, UserFailedLoginRepository>();
         services.AddScoped<IUserLoginHistoryRepository, UserLoginHistoryRepository>();

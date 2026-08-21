@@ -27,7 +27,8 @@ public class AuthService(
     IOptions<JwtOptions> jwtOptions,
     IOptions<FrontendOptions> frontendOptions,
     IOptions<Two2FACodesOptions> two2FACodesOptions,
-    ILogger<AuthService> logger) : IAuthService
+    ILogger<AuthService> logger,
+    IUnitOfWork unitOfWork) : IAuthService
 {
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private readonly FrontendOptions _frontendOptions = frontendOptions.Value;
@@ -424,23 +425,38 @@ public class AuthService(
             return ServiceResult.Failure("User not found.");
         }
 
-        // Must run before UserManager.DeleteAsync: VaultProfile, owned VaultItems and granted
-        // VaultKeyShares all cascade-delete with the user, but VaultKeyShare.Holder and
-        // VaultItemRevision.ChangedBy are both Restrict FKs (see AppDbContext), so any share this
-        // user holds - including their own self-share - or any revision they ever recorded (even
-        // on someone else's item, via edit access) would otherwise block the delete with a FK
-        // constraint violation. Sequential, not Task.WhenAll: both run ExecuteDeleteAsync against
-        // the same DbContext/connection, which isn't safe to do concurrently without MARS.
-        await vaultRepository.DeleteHoldersSharesByIdAsync(userId, ct);
-        await vaultRepository.RemoveAllItemRevisionsForItemAsync(userId, ct);
+        await using var transaction = await unitOfWork.BeginTransactionAsync(ct);
+        try
+        {
+            // Must run before UserManager.DeleteAsync: VaultProfile, owned VaultItems and granted
+            // VaultKeyShares all cascade-delete with the user, but VaultKeyShare.Holder and
+            // VaultItemRevision.ChangedBy are both Restrict FKs (see AppDbContext), so any share this
+            // user holds - including their own self-share - or any revision they ever recorded (even
+            // on someone else's item, via edit access) would otherwise block the delete with a FK
+            // constraint violation. Sequential, not Task.WhenAll: both run ExecuteDeleteAsync against
+            // the same DbContext/connection, which isn't safe to do concurrently without MARS.
+            await vaultRepository.DeleteHoldersSharesByIdAsync(userId, ct);
+            await vaultRepository.RemoveAllItemRevisionsForItemAsync(userId, ct);
+            // Stripe has no idea the account is about to disappear - cancel any active/past-due
+            // subscription first so the user doesn't keep getting billed after their account is gone.
+            // The Subscriptions row itself cascade-deletes with the user (see AppDbContext).
+            await billingService.CancelSubscriptionAsync(userId, ct);
+            var result = await userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                await transaction.RollbackAsync(ct);
+                return ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+            }
 
-        // Stripe has no idea the account is about to disappear - cancel any active/past-due
-        // subscription first so the user doesn't keep getting billed after their account is gone.
-        // The Subscriptions row itself cascade-deletes with the user (see AppDbContext).
-        await billingService.CancelSubscriptionAsync(userId, ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
 
-        var result = await userManager.DeleteAsync(user);
-        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+        return ServiceResult.Success();
     }
 
     public async Task<UserProfileDto?> GetProfileAsync(Guid userId, CancellationToken ct)
