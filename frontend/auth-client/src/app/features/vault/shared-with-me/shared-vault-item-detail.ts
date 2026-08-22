@@ -15,6 +15,7 @@ import { decryptFileBytes, decryptItemPayload, encryptItemPayload } from '../../
 import { DecryptedVaultItem, VaultItemAttachmentDto, VaultItemDto, VaultItemPayload } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { relativeTime } from '../../../core/utils/relative-time.util';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
 
@@ -88,6 +89,14 @@ export class SharedVaultItemDetail implements OnInit {
 
   get fields(): FormArray {
     return this.form.controls.fields;
+  }
+
+  createdUpdatedLabel(): string {
+    const current = this.item();
+    if (!current) return '';
+    return current.createdAt === current.updatedAt
+      ? `Created ${relativeTime(current.createdAt)}`
+      : `Updated ${relativeTime(current.updatedAt)}`;
   }
 
   async ngOnInit(): Promise<void> {

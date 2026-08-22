@@ -1,7 +1,6 @@
 import { Component, OnInit, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -20,7 +19,6 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
   imports: [
     RouterLink,
     ReactiveFormsModule,
-    MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -94,6 +92,17 @@ export class SharedWithMeList implements OnInit {
         return 'Code expired - resend to try again';
       case 'Failed':
         return 'Too many attempts - ask them to share again';
+    }
+  }
+
+  statusTagClass(status: VaultShareStatus): string {
+    switch (status) {
+      case 'Active':
+        return 'tag-accent';
+      case 'Failed':
+        return 'tag-outline';
+      default:
+        return 'tag-neutral';
     }
   }
 

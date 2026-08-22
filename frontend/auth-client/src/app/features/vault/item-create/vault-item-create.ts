@@ -3,7 +3,6 @@ import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { filter, firstValueFrom } from 'rxjs';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -28,7 +27,6 @@ export const ALLOWED_ATTACHMENT_EXTENSIONS = ['.pdf', '.docx'];
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    MatCardModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,

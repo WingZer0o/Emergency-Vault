@@ -1,9 +1,4 @@
 <div class="vault-page">
-  <div class="vault-header">
-    <h1>{{ item()?.label || ownerName() || 'Shared item' }}</h1>
-    <a mat-button [routerLink]="['/vault/shared-with-me', ownerUserId]">Back</a>
-  </div>
-
   @if (loading()) {
     <mat-progress-spinner diameter="32" mode="indeterminate" />
   } @else if (challengeToken()) {
@@ -54,116 +49,125 @@
       </mat-card-content>
     </mat-card>
   } @else if (errorMessage(); as message) {
+    <div class="item-header">
+      <h1>{{ ownerName() || 'Shared item' }}</h1>
+      <a mat-stroked-button [routerLink]="['/vault/shared-with-me', ownerUserId]">Back</a>
+    </div>
     <p class="error-text">{{ message }}</p>
   } @else if (item(); as currentItem) {
-    <mat-card class="item-card">
-      <mat-card-header>
-        <mat-card-title>{{ editing() ? 'Edit item' : currentItem.label }}</mat-card-title>
-        <mat-card-subtitle>{{ currentItem.itemType }}</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        @if (!editing()) {
-          <dl class="field-list">
-            @for (field of currentItem.fields; track field.name) {
-              <div class="field-row-view">
-                <dt>{{ field.name }}</dt>
-                <dd>
-                  <span>{{ isRevealed(field.name) ? field.value : '••••••••' }}</span>
-                  <button mat-icon-button type="button" (click)="toggleReveal(field.name)" aria-label="Toggle visibility">
-                    <mat-icon>{{ isRevealed(field.name) ? 'visibility_off' : 'visibility' }}</mat-icon>
-                  </button>
-                  <button mat-icon-button type="button" (click)="copyValue(field.value)" aria-label="Copy value">
-                    <mat-icon>content_copy</mat-icon>
-                  </button>
-                </dd>
-              </div>
-            }
-          </dl>
-
-          @if (attachments().length > 0) {
-            <div class="attachments">
-              <h3>Attachments</h3>
-              <ul class="attachment-list">
-                @for (attachment of attachments(); track attachment.id) {
-                  <li>
-                    <mat-icon>description</mat-icon>
-                    <span>{{ attachment.fileName }}</span>
-                    <button
-                      mat-icon-button
-                      type="button"
-                      (click)="downloadAttachment(attachment)"
-                      [disabled]="downloadingId() === attachment.id"
-                      aria-label="Download file"
-                    >
-                      <mat-icon>download</mat-icon>
-                    </button>
-                  </li>
-                }
-              </ul>
-            </div>
+    @if (!editing()) {
+      <div class="item-header">
+        <div>
+          <div class="k">{{ currentItem.itemType }}</div>
+          <h1>{{ currentItem.label }}</h1>
+          @if (createdUpdatedLabel(); as label) {
+            <div class="k item-dates">{{ label }}</div>
           }
-
+        </div>
+        <div class="item-header-actions">
+          <a mat-stroked-button [routerLink]="['/vault/shared-with-me', ownerUserId]">Back</a>
           @if (canEdit()) {
-            <div class="actions">
-              <button mat-flat-button color="primary" type="button" (click)="startEditing()">Edit</button>
+            <button mat-flat-button color="primary" type="button" (click)="startEditing()">Edit</button>
+          }
+        </div>
+      </div>
+
+      <section class="item-section">
+        <div class="k section-label">Fields</div>
+        <dl class="field-list">
+          @for (field of currentItem.fields; track field.name) {
+            <div class="field-row-view">
+              <dt>{{ field.name }}</dt>
+              <dd>
+                <span class="mono">{{ isRevealed(field.name) ? field.value : '••••••••' }}</span>
+                <button mat-icon-button type="button" (click)="toggleReveal(field.name)" aria-label="Toggle visibility">
+                  <mat-icon>{{ isRevealed(field.name) ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                <button mat-icon-button type="button" (click)="copyValue(field.value)" aria-label="Copy value">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </dd>
             </div>
           }
-        } @else {
-          <form [formGroup]="form" (ngSubmit)="save()">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Label</mat-label>
-              <input matInput formControlName="label" />
-            </mat-form-field>
+        </dl>
+      </section>
 
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Type</mat-label>
-              <mat-select formControlName="itemType">
-                @for (type of itemTypes; track type) {
-                  <mat-option [value]="type">{{ type }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-
-            <div formArrayName="fields" class="fields">
-              @for (field of fields.controls; track $index) {
-                <div [formGroupName]="$index" class="field-row">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Field name</mat-label>
-                    <input matInput formControlName="name" />
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Value</mat-label>
-                    <input matInput formControlName="value" />
-                  </mat-form-field>
-                  <button mat-icon-button type="button" (click)="removeField($index)" aria-label="Remove field">
-                    <mat-icon>remove_circle_outline</mat-icon>
-                  </button>
-                </div>
-              }
-            </div>
-
-            <button mat-stroked-button type="button" (click)="addField()">
-              <mat-icon>add</mat-icon>
-              Add field
-            </button>
-
-            @if (errorMessage(); as message) {
-              <p class="error-text">{{ message }}</p>
+      @if (attachments().length > 0) {
+        <section class="item-section">
+          <div class="k section-label">Attachments</div>
+          <ul class="attachment-list">
+            @for (attachment of attachments(); track attachment.id) {
+              <li>
+                <mat-icon>description</mat-icon>
+                <span>{{ attachment.fileName }}</span>
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="downloadAttachment(attachment)"
+                  [disabled]="downloadingId() === attachment.id"
+                  aria-label="Download file"
+                >
+                  <mat-icon>download</mat-icon>
+                </button>
+              </li>
             }
+          </ul>
+        </section>
+      }
+    } @else {
+      <form [formGroup]="form" (ngSubmit)="save()" class="edit-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Label</mat-label>
+          <input matInput formControlName="label" />
+        </mat-form-field>
 
-            <div class="actions">
-              <button mat-button type="button" (click)="cancelEditing()">Cancel</button>
-              <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
-                @if (saving()) {
-                  <mat-progress-spinner diameter="20" mode="indeterminate" />
-                } @else {
-                  Save
-                }
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Type</mat-label>
+          <mat-select formControlName="itemType">
+            @for (type of itemTypes; track type) {
+              <mat-option [value]="type">{{ type }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div formArrayName="fields" class="fields">
+          @for (field of fields.controls; track $index) {
+            <div [formGroupName]="$index" class="field-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Field name</mat-label>
+                <input matInput formControlName="name" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Value</mat-label>
+                <input matInput formControlName="value" />
+              </mat-form-field>
+              <button mat-icon-button type="button" (click)="removeField($index)" aria-label="Remove field">
+                <mat-icon>remove_circle_outline</mat-icon>
               </button>
             </div>
-          </form>
+          }
+        </div>
+
+        <button mat-stroked-button type="button" (click)="addField()">
+          <mat-icon>add</mat-icon>
+          Add field
+        </button>
+
+        @if (errorMessage(); as message) {
+          <p class="error-text">{{ message }}</p>
         }
-      </mat-card-content>
-    </mat-card>
+
+        <div class="item-actions">
+          <button mat-button type="button" (click)="cancelEditing()">Cancel</button>
+          <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+            @if (saving()) {
+              <mat-progress-spinner diameter="20" mode="indeterminate" />
+            } @else {
+              Save
+            }
+          </button>
+        </div>
+      </form>
+    }
   }
 </div>

@@ -2,8 +2,6 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { BillingService } from '../../core/services/billing.service';
@@ -12,7 +10,7 @@ import { extractErrorMessage } from '../auth/auth-error.util';
 
 @Component({
   selector: 'app-billing',
-  imports: [DatePipe, MatCardModule, MatButtonModule, MatChipsModule, MatProgressSpinnerModule],
+  imports: [DatePipe, MatButtonModule, MatProgressSpinnerModule],
   templateUrl: './billing.html',
   styleUrl: './billing.scss',
 })
