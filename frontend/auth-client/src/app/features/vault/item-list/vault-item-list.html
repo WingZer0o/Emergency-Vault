@@ -15,10 +15,18 @@
     <mat-progress-spinner diameter="32" mode="indeterminate" />
   } @else if (errorMessage(); as message) {
     <p class="error-text">{{ message }}</p>
-  } @else if (items().length === 0) {
-    <p>No items yet. Add your first one.</p>
   } @else {
     <mat-card>
+      <mat-card-header>
+        <mat-card-title>
+          <form>
+            <mat-form-field appearance="fill">
+              <mat-label>Search</mat-label>
+              <input matInput [(ngModel)]="searchQuery" name="searchQuery" />
+            </mat-form-field>
+          </form>
+        </mat-card-title>
+      </mat-card-header>
       <mat-list>
         @for (item of pagedItems(); track item.id; let last = $last) {
           <mat-list-item matRipple [matRippleColor]="'rgba(255, 0, 0, 0.1)'" (click)="openItem(item.id)" class="vault-item">
@@ -41,7 +49,7 @@
           }
         }
       </mat-list>
-      <app-paginator [length]="items().length" [(pageIndex)]="pageIndex" />
+      <app-paginator [length]="filteredItems().length" [(pageIndex)]="pageIndex" />
     </mat-card>
   }
 </div>
