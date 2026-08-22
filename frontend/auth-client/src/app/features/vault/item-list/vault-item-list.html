@@ -17,14 +17,7 @@
     <p class="error-text">{{ message }}</p>
   } @else {
     <mat-card>
-      <mat-card-header>
-          <form>
-            <mat-form-field appearance="fill">
-              <mat-label>Search</mat-label>
-              <input matInput class="search-bar" [(ngModel)]="searchQuery" name="searchQuery" />
-            </mat-form-field>
-          </form>
-      </mat-card-header>
+      <app-search-query-bar [(searchQuery)]="searchQuery"></app-search-query-bar>
       <mat-card-content>
         <mat-list>
           @for (item of pagedItems(); track item.id; let last = $last) {

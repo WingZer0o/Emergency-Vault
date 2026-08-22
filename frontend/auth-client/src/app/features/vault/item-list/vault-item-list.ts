@@ -21,6 +21,7 @@ import { MatRippleModule } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
+import { SearchQueryBar } from '../../../components/search-query-bar/search-query-bar';
 
 @Component({
   selector: 'app-vault-item-list',
@@ -38,6 +39,7 @@ import { FormsModule } from '@angular/forms';
     MatFormFieldModule,
     MatInputModule,
     FormsModule,
+    SearchQueryBar,
   ],
   templateUrl: './vault-item-list.html',
   styleUrls: ['./vault-item-list.scss'],
@@ -51,6 +53,7 @@ export class VaultItemList implements OnInit {
 
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
+
   readonly items = signal<DecryptedVaultItem[]>([]);
   readonly searchQuery = signal<string | null>(null);
   readonly filteredItems: Signal<DecryptedVaultItem[]> = computed(() => {
