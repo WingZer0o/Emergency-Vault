@@ -12,6 +12,7 @@
     <p>No one has shared their vault with you yet.</p>
   } @else {
     <mat-card>
+      <app-search-query-bar [(searchQuery)]="sharesSearchQuery"></app-search-query-bar>
       <mat-list>
         @for (share of pagedShares(); track share.id) {
           <mat-list-item (click)="onItemClick(share)" class="vault-item" [class.disabled]="share.status === 'Failed'">
@@ -63,13 +64,14 @@
           }
         }
       </mat-list>
-      <app-paginator [length]="shares().length" [(pageIndex)]="sharesPageIndex" />
+      <app-paginator [length]="filteredShares().length" [(pageIndex)]="sharesPageIndex" />
     </mat-card>
   }
 
   @if (itemShares().length > 0) {
     <h2 class="section-heading">Items shared with me</h2>
     <mat-card>
+      <app-search-query-bar [(searchQuery)]="itemSharesSearchQuery"></app-search-query-bar>
       <mat-list>
         @for (share of pagedItemShares(); track share.shareId) {
           <mat-list-item (click)="onItemShareClick(share)" class="vault-item" [class.disabled]="share.status === 'Failed'">
@@ -121,7 +123,7 @@
           }
         }
       </mat-list>
-      <app-paginator [length]="itemShares().length" [(pageIndex)]="itemSharesPageIndex" />
+      <app-paginator [length]="filteredItemShares().length" [(pageIndex)]="itemSharesPageIndex" />
     </mat-card>
   }
 </div>

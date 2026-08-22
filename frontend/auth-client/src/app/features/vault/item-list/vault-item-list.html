@@ -15,33 +15,34 @@
     <mat-progress-spinner diameter="32" mode="indeterminate" />
   } @else if (errorMessage(); as message) {
     <p class="error-text">{{ message }}</p>
-  } @else if (items().length === 0) {
-    <p>No items yet. Add your first one.</p>
   } @else {
     <mat-card>
-      <mat-list>
-        @for (item of pagedItems(); track item.id; let last = $last) {
-          <mat-list-item matRipple [matRippleColor]="'rgba(255, 0, 0, 0.1)'" (click)="openItem(item.id)" class="vault-item">
-            <span matListItemTitle>{{ item.label }}</span>
-            <span matListItemLine>{{ item.itemType }}</span>
-            <button
-              mat-icon-button
-              matListItemMeta
-              (click)="viewViewers(item.id, $event)"
-              aria-label="Who viewed this item"
-            >
-              <mat-icon>visibility</mat-icon>
-            </button>
-            <button mat-icon-button matListItemMeta (click)="deleteItem(item.id, $event)" aria-label="Delete item">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </mat-list-item>
-          @if (!last) {
-            <mat-divider></mat-divider>
+      <app-search-query-bar [(searchQuery)]="searchQuery"></app-search-query-bar>
+      <mat-card-content>
+        <mat-list>
+          @for (item of pagedItems(); track item.id; let last = $last) {
+            <mat-list-item matRipple [matRippleColor]="'rgba(255, 0, 0, 0.1)'" (click)="openItem(item.id)" class="vault-item">
+              <span matListItemTitle>{{ item.label }}</span>
+              <span matListItemLine>{{ item.itemType }}</span>
+              <button
+                mat-icon-button
+                matListItemMeta
+                (click)="viewViewers(item.id, $event)"
+                aria-label="Who viewed this item"
+              >
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button mat-icon-button matListItemMeta (click)="deleteItem(item.id, $event)" aria-label="Delete item">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </mat-list-item>
+            @if (!last) {
+              <mat-divider></mat-divider>
+            }
           }
-        }
-      </mat-list>
-      <app-paginator [length]="items().length" [(pageIndex)]="pageIndex" />
+        </mat-list>
+        <app-paginator [length]="filteredItems().length" [(pageIndex)]="pageIndex" />
+      </mat-card-content>
     </mat-card>
   }
 </div>

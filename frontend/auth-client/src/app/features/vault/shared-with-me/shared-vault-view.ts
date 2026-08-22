@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -17,6 +17,7 @@ import { PaginationService } from '../../../core/services/pagination.service';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { Paginator } from '../../../shared/paginator/paginator';
+import { SearchQueryBar } from '../../../components/search-query-bar/search-query-bar';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { PageEvent } from '@angular/material/paginator';
 
@@ -38,6 +39,7 @@ import { PageEvent } from '@angular/material/paginator';
     MatListModule,
     MatProgressSpinnerModule,
     Paginator,
+    SearchQueryBar,
   ],
   templateUrl: './shared-vault-view.html',
   styleUrl: './shared-vault-view.scss',
@@ -59,9 +61,17 @@ export class SharedVaultView implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly ownerName = signal('');
   readonly items = signal<DecryptedVaultItem[]>([]);
-  readonly pageIndex = signal(0);
+  readonly searchQuery = signal<string | null>(null);
+  readonly filteredItems: Signal<DecryptedVaultItem[]> = computed(() => {
+    const query = this.searchQuery()?.toLowerCase() ?? '';
+    if (!query) return this.items();
+    return this.items().filter((item) => item.label.toLowerCase().includes(query));
+  });
+  // Editing the query re-filters the list under the paginator, so send the user back to page 1
+  // rather than leaving them stranded past the end of a now-shorter list.
+  readonly pageIndex = linkedSignal({ source: this.searchQuery, computation: () => 0 });
 
-  readonly pagedItems = this.pagination.slice(this.items, this.pageIndex);
+  readonly pagedItems = this.pagination.slice(this.filteredItems, this.pageIndex);
 
   /** Set once the backend says a fresh emailed code is required to view this vault this session. */
   readonly challengeToken = signal<string | null>(null);

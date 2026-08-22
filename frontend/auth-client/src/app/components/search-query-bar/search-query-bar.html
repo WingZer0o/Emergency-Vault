@@ -1,0 +1,14 @@
+<mat-card-header>
+  <form>
+    <mat-form-field appearance="fill">
+      <mat-label>Search</mat-label>
+      <input
+        matInput
+        class="search-bar"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        name="searchQuery"
+      />
+    </mat-form-field>
+  </form>
+</mat-card-header>
