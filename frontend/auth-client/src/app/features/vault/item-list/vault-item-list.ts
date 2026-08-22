@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -18,6 +18,9 @@ import { Paginator } from '../../../shared/paginator/paginator';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { MatRippleModule } from '@angular/material/core';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-vault-item-list',
@@ -31,7 +34,10 @@ import { MatRippleModule } from '@angular/material/core';
     MatListModule,
     MatProgressSpinnerModule,
     Paginator,
-    MatRippleModule
+    MatRippleModule,
+    MatFormFieldModule,
+    MatInputModule,
+    FormsModule,
   ],
   templateUrl: './vault-item-list.html',
   styleUrls: ['./vault-item-list.scss'],
@@ -46,9 +52,16 @@ export class VaultItemList implements OnInit {
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly items = signal<DecryptedVaultItem[]>([]);
-
-  readonly pageIndex = signal(0);
-  readonly pagedItems = this.pagination.slice(this.items, this.pageIndex);
+  readonly searchQuery = signal<string | null>(null);
+  readonly filteredItems: Signal<DecryptedVaultItem[]> = computed(() => {
+    const query = this.searchQuery()?.toLowerCase() ?? '';
+    if (!query) return this.items();
+    return this.items().filter(item => item.label.toLowerCase().includes(query));
+  });
+  // Editing the query re-filters the list under the paginator, so send the user back to page 1
+  // rather than leaving them stranded past the end of a now-shorter list.
+  readonly pageIndex = linkedSignal({ source: this.searchQuery, computation: () => 0 });
+  readonly pagedItems = this.pagination.slice(this.filteredItems, this.pageIndex);
 
   ngOnInit(): void {
     this.loadItems();
