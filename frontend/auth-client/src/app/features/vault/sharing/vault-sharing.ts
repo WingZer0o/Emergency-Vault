@@ -13,6 +13,8 @@ import { VaultShareDto, VaultShareStatus } from '../../../core/models/vault.mode
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
+import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { MatDialog } from '@angular/material/dialog';
 
 @Component({
   selector: 'app-vault-sharing',
@@ -32,6 +34,7 @@ export class VaultSharing implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly vaultService = inject(VaultService);
   private readonly vaultSession = inject(VaultSessionService);
+  private readonly dialog = inject(MatDialog);
 
   readonly loading = signal(false);
   readonly loadingShares = signal(true);
@@ -94,10 +97,19 @@ export class VaultSharing implements OnInit {
   }
 
   revoke(shareId: string): void {
-    this.vaultService.revokeShare(shareId).subscribe({
-      next: () => this.shares.update((shares) => shares.filter((share) => share.id !== shareId)),
-      error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not revoke access.')),
-    });
+    this.dialog.open(ConfirmDialog, {
+      data: {
+        title: 'Revoke Access',
+        message: 'Are you sure you want to revoke access for this user?',
+      },
+    }).afterClosed().subscribe((confirmed) => { 
+      if (confirmed) {
+        this.vaultService.revokeShare(shareId).subscribe({
+          next: () => this.shares.update((shares) => shares.filter((share) => share.id !== shareId)),
+          error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not revoke access.')),
+        });
+      }
+    })
   }
 
   statusTagClass(status: VaultShareStatus): string {
