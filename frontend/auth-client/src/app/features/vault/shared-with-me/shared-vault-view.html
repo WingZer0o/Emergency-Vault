@@ -59,6 +59,7 @@
     <p>This vault has no items yet.</p>
   } @else {
     <mat-card>
+      <app-search-query-bar [(searchQuery)]="searchQuery"></app-search-query-bar>
       <mat-list>
         @for (item of pagedItems(); track item.id; let last = $last) {
           <mat-list-item (click)="openItem(item.id)" class="vault-item">
@@ -70,7 +71,7 @@
           }
         }
       </mat-list>
-      <app-paginator [length]="items().length" [(pageIndex)]="pageIndex" />
+      <app-paginator [length]="filteredItems().length" [(pageIndex)]="pageIndex" />
     </mat-card>
   }
 </div>
