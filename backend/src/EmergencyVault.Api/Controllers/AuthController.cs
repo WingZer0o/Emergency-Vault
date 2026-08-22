@@ -161,7 +161,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     public async Task<IActionResult> TwoFactorStatus(CancellationToken ct)
     {
         var status = await authService.GetTwoFactorStatusAsync(User.GetUserId(), ct);
-        return Ok(new { enabled = status.Enabled, method = status.Method.ToString() });
+        return Ok(new { enabled = status.Enabled, method = status.Method.ToString(), recoveryCodesRemaining = status.RecoveryCodesRemaining });
     }
 
     [HttpPost("two-factor/enable")]
@@ -170,7 +170,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     {
         var result = await authService.EnableTwoFactorAsync(User.GetUserId(), ct);
         return result.Succeeded
-            ? Ok(new { message = "Two-factor authentication enabled." })
+            ? Ok(new { message = "Two-factor authentication enabled.", recoveryCodes = result.Data?.RecoveryCodes })
             : BadRequest(new { errors = result.Errors });
     }
 
@@ -200,8 +200,33 @@ public class AuthController(IAuthService authService) : ControllerBase
     {
         var result = await authService.ConfirmTotpEnrollmentAsync(User.GetUserId(), request.Code, ct);
         return result.Succeeded
-            ? Ok(new { message = "Authenticator app enabled." })
+            ? Ok(new { message = "Authenticator app enabled.", recoveryCodes = result.Data?.RecoveryCodes })
             : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("two-factor/recovery-codes/regenerate")]
+    [Authorize(Roles="User")]
+    public async Task<IActionResult> RegenerateRecoveryCodes(CancellationToken ct)
+    {
+        var result = await authService.RegenerateRecoveryCodesAsync(User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(new { codes = result.Data!.Codes })
+            : BadRequest(new { errors = result.Errors });
+    }
+
+    [HttpPost("login/two-factor/recovery")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyTwoFactorRecoveryCode(VerifyTwoFactorRecoveryRequest request, CancellationToken ct)
+    {
+        var result = await authService.VerifyTwoFactorRecoveryCodeAsync(
+            request.TwoFactorToken, request.RecoveryCode, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
+        if (!result.Succeeded || result.Data is null)
+        {
+            return Unauthorized(new { errors = result.Errors });
+        }
+
+        SetRefreshCookie(result.Data.RefreshToken, result.Data.RefreshTokenExpiresAt);
+        return Ok(ToAuthResponse(result.Data));
     }
 
     private void SetRefreshCookie(string token, DateTimeOffset expiresAt)

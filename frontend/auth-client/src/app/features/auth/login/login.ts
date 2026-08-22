@@ -36,6 +36,7 @@ export class Login {
   readonly errorMessage = signal<string | null>(null);
   readonly twoFactorToken = signal<string | null>(null);
   readonly twoFactorMethod = signal<TwoFactorMethodName | null>(null);
+  readonly useRecoveryCode = signal(false);
 
   /** Captured at submit() so a silent vault unlock attempt can reuse it after a 2FA challenge, without prompting for the password twice. */
   private pendingPassword = '';
@@ -47,6 +48,10 @@ export class Login {
 
   readonly codeForm = this.fb.nonNullable.group({
     code: ['', [Validators.required, Validators.pattern(/^\d{6}$/)]],
+  });
+
+  readonly recoveryForm = this.fb.nonNullable.group({
+    recoveryCode: ['', [Validators.required]],
   });
 
   submit(): void {
@@ -100,6 +105,38 @@ export class Login {
     });
   }
 
+  submitRecoveryCode(): void {
+    const token = this.twoFactorToken();
+    if (!token || this.recoveryForm.invalid) {
+      this.recoveryForm.markAllAsTouched();
+      return;
+    }
+
+    this.loading.set(true);
+    this.errorMessage.set(null);
+
+    this.authService
+      .verifyTwoFactorRecoveryCode({ twoFactorToken: token, recoveryCode: this.recoveryForm.getRawValue().recoveryCode })
+      .subscribe({
+        next: () => {
+          this.loading.set(false);
+          this.tryUnlockVault();
+          this.router.navigateByUrl('/profile');
+        },
+        error: (err) => {
+          this.loading.set(false);
+          this.errorMessage.set(extractErrorMessage(err, 'Incorrect or already-used recovery code.'));
+        },
+      });
+  }
+
+  toggleRecoveryCode(): void {
+    this.useRecoveryCode.set(!this.useRecoveryCode());
+    this.errorMessage.set(null);
+    this.codeForm.reset();
+    this.recoveryForm.reset();
+  }
+
   /**
    * Best-effort, fire-and-forget: unlocks the vault silently using the password already typed for
    * login, so the common case needs no extra prompt. Failure (no vault, or a password that's
@@ -126,7 +163,9 @@ export class Login {
   cancelTwoFactor(): void {
     this.twoFactorToken.set(null);
     this.twoFactorMethod.set(null);
+    this.useRecoveryCode.set(false);
     this.codeForm.reset();
+    this.recoveryForm.reset();
     this.errorMessage.set(null);
   }
 }

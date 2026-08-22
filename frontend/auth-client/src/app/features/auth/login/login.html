@@ -46,7 +46,9 @@
       <mat-card-header>
         <mat-card-title>Enter verification code</mat-card-title>
         <mat-card-subtitle>
-          @if (twoFactorMethod() === 'Totp') {
+          @if (useRecoveryCode()) {
+            Enter one of your saved recovery codes.
+          } @else if (twoFactorMethod() === 'Totp') {
             Enter the 6-digit code from your authenticator app.
           } @else {
             We emailed you a 6-digit code.
@@ -54,42 +56,72 @@
         </mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <form [formGroup]="codeForm" (ngSubmit)="submitCode()">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Code</mat-label>
-            <input
-              matInput
-              type="text"
-              inputmode="numeric"
-              formControlName="code"
-              autocomplete="one-time-code"
-              maxlength="6"
-            />
-            @if (codeForm.controls.code.hasError('required')) {
-              <mat-error>Code is required.</mat-error>
-            } @else if (codeForm.controls.code.hasError('pattern')) {
-              <mat-error>Enter the 6-digit code.</mat-error>
-            }
-          </mat-form-field>
-
-          @if (errorMessage(); as message) {
-            <p class="error-text">{{ message }}</p>
-          }
-
-          <div class="actions">
-            <a (click)="cancelTwoFactor()">Back to sign in</a>
-            <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
-              @if (loading()) {
-                <mat-progress-spinner diameter="20" mode="indeterminate" />
-              } @else {
-                Verify
+        @if (!useRecoveryCode()) {
+          <form [formGroup]="codeForm" (ngSubmit)="submitCode()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Code</mat-label>
+              <input
+                matInput
+                type="text"
+                inputmode="numeric"
+                formControlName="code"
+                autocomplete="one-time-code"
+                maxlength="6"
+              />
+              @if (codeForm.controls.code.hasError('required')) {
+                <mat-error>Code is required.</mat-error>
+              } @else if (codeForm.controls.code.hasError('pattern')) {
+                <mat-error>Enter the 6-digit code.</mat-error>
               }
-            </button>
-          </div>
-        </form>
+            </mat-form-field>
 
-        @if (twoFactorMethod() === 'Email') {
-          <p class="switch-link"><a (click)="resendCode()">Resend code</a></p>
+            @if (errorMessage(); as message) {
+              <p class="error-text">{{ message }}</p>
+            }
+
+            <div class="actions">
+              <a (click)="cancelTwoFactor()">Back to sign in</a>
+              <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
+                @if (loading()) {
+                  <mat-progress-spinner diameter="20" mode="indeterminate" />
+                } @else {
+                  Verify
+                }
+              </button>
+            </div>
+          </form>
+
+          @if (twoFactorMethod() === 'Email') {
+            <p class="switch-link"><a (click)="resendCode()">Resend code</a></p>
+          }
+          <p class="switch-link"><a (click)="toggleRecoveryCode()">Use a recovery code instead</a></p>
+        } @else {
+          <form [formGroup]="recoveryForm" (ngSubmit)="submitRecoveryCode()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Recovery code</mat-label>
+              <input matInput type="text" formControlName="recoveryCode" autocomplete="one-time-code" />
+              @if (recoveryForm.controls.recoveryCode.hasError('required')) {
+                <mat-error>Recovery code is required.</mat-error>
+              }
+            </mat-form-field>
+
+            @if (errorMessage(); as message) {
+              <p class="error-text">{{ message }}</p>
+            }
+
+            <div class="actions">
+              <a (click)="cancelTwoFactor()">Back to sign in</a>
+              <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
+                @if (loading()) {
+                  <mat-progress-spinner diameter="20" mode="indeterminate" />
+                } @else {
+                  Verify
+                }
+              </button>
+            </div>
+          </form>
+
+          <p class="switch-link"><a (click)="toggleRecoveryCode()">Use your normal code instead</a></p>
         }
       </mat-card-content>
     }

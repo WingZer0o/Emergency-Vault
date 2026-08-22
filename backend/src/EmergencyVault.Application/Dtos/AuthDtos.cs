@@ -51,8 +51,17 @@ public record VerifyTwoFactorRequest(
 
 public record ResendTwoFactorRequest([Required] string TwoFactorToken);
 
-public record TwoFactorStatusResult(bool Enabled, TwoFactorMethod Method);
+public record TwoFactorStatusResult(bool Enabled, TwoFactorMethod Method, int RecoveryCodesRemaining);
 
 public record TotpEnrollmentResult(string Secret, string QrCodePng);
 
 public record ConfirmTotpRequest([Required, StringLength(6, MinimumLength = 6)] string Code);
+
+/// <summary>RecoveryCodes is only populated when a fresh batch was just generated - it's plaintext-visible exactly once.</summary>
+public record TwoFactorActivationResult(IReadOnlyList<string>? RecoveryCodes);
+
+public record RecoveryCodesResult(IReadOnlyList<string> Codes);
+
+public record VerifyTwoFactorRecoveryRequest(
+    [Required] string TwoFactorToken,
+    [Required] string RecoveryCode);

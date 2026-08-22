@@ -33,11 +33,27 @@ export interface VerifyTwoFactorRequest {
 export interface TwoFactorStatus {
   enabled: boolean;
   method: TwoFactorMethodName;
+  recoveryCodesRemaining: number;
 }
 
 export interface TotpEnrollment {
   secret: string;
   qrCode: string;
+}
+
+export interface TwoFactorActivationResponse {
+  message: string;
+  /** Present only the first time a method is ever enabled - the one moment codes are visible in plaintext. */
+  recoveryCodes?: string[];
+}
+
+export interface RecoveryCodesResponse {
+  codes: string[];
+}
+
+export interface VerifyTwoFactorRecoveryRequest {
+  twoFactorToken: string;
+  recoveryCode: string;
 }
 
 export interface RegisterRequest {
