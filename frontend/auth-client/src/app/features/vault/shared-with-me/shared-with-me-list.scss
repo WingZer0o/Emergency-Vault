@@ -1,16 +1,42 @@
+:host {
+  display: block;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
 .vault-page {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding: 28px 28px 60px;
 }
 
 .vault-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--color-divider);
+
+  h1 {
+    font-size: 38px;
+    letter-spacing: -0.03em;
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 800;
+  }
+}
+
+.share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+mat-list-item {
+  border-bottom: 1px solid var(--color-divider);
 }
 
 .vault-item {
@@ -21,31 +47,14 @@
   }
 }
 
-.share-status {
-  font-size: 0.9em;
-}
-
-.status-active {
-  color: var(--mat-sys-primary);
-}
-
-.status-pending {
-  color: var(--mat-sys-on-surface-variant);
-}
-
-.status-codeexpired {
-  color: var(--mat-sys-tertiary);
-}
-
-.status-failed {
-  color: var(--mat-sys-error);
-}
-
 .verify-form {
   padding: 0 16px 16px;
 }
 
 .section-heading {
-  font-size: 16px;
-  margin: 8px 0 0;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  margin: 32px 0 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
 }

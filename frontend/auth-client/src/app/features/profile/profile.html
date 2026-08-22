@@ -1,133 +1,163 @@
-<div class="dashboard-page">
-  <mat-card class="profile-card">
-    <mat-card-header>
-      <mat-card-title>Welcome, {{ authService.currentUser()?.firstName }}</mat-card-title>
-      <mat-card-subtitle>{{ authService.currentUser()?.email }}</mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      <mat-chip-set>
+<div class="profile-page">
+  <div class="profile-header">
+    <div class="identity">
+      <div class="k">Account</div>
+      <h1>{{ authService.currentUser()?.firstName }} {{ authService.currentUser()?.lastName }}</h1>
+      <div class="mono identity-email">{{ authService.currentUser()?.email }}</div>
+      <div class="identity-tags">
         @for (role of authService.currentUser()?.roles; track role) {
-          <mat-chip>{{ role }}</mat-chip>
+          <span class="tag tag-neutral">{{ role }}</span>
         }
-      </mat-chip-set>
-    </mat-card-content>
-  </mat-card>
-
-  <mat-card class="security-card">
-    <mat-card-header>
-      <mat-card-title>Security</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
+      </div>
+    </div>
+    <div class="sign-in-status">
+      <div class="k accent">Sign-in</div>
       @if (twoFactorLoading()) {
-        <mat-progress-spinner diameter="28" mode="indeterminate" />
+        <mat-progress-spinner diameter="24" mode="indeterminate" />
       } @else {
-        <mat-radio-group
-          [value]="twoFactorMethod()"
-          [disabled]="twoFactorSaving()"
-          (change)="onTwoFactorMethodChange($event)"
-        >
-          <mat-radio-button value="None">Off</mat-radio-button>
-          <mat-radio-button value="Email">Email code</mat-radio-button>
-          <mat-radio-button value="Totp">Authenticator app</mat-radio-button>
-        </mat-radio-group>
-        <p class="hint-text">
-          Choose one way to verify it's you when you sign in: an emailed code, or a code from an
-          authenticator app like Microsoft Authenticator or Google Authenticator.
-        </p>
-        @if (twoFactorError(); as message) {
-          <p class="error-text">{{ message }}</p>
-        }
-
-        @if (twoFactorMethod() !== 'None') {
-          <p class="hint-text">
-            {{ recoveryCodesRemaining() }} recovery code{{ recoveryCodesRemaining() === 1 ? '' : 's' }} remaining.
-          </p>
-          <button mat-flat-button color="primary" (click)="regenerateRecoveryCodes()">Regenerate recovery codes</button>
-        }
-
-        @if (recoveryCodes(); as codes) {
-          <div class="recovery-codes-reveal">
-            <p class="warning-text">
-              Save these recovery codes somewhere safe. Each one can be used once to sign in if you
-              lose access to your normal two-factor method. They won't be shown again.
-            </p>
-            <pre class="recovery-codes-list">{{ codes.join('\n') }}</pre>
-            <div class="actions">
-              <button mat-flat-button color="primary" (click)="downloadRecoveryCodes()">Download as .txt</button>
-              <button mat-flat-button color="primary" (click)="dismissRecoveryCodes()">Done</button>
-            </div>
-          </div>
-        }
-
-        @if (totpEnrollmentActive()) {
-          <div class="totp-setup">
-            <p class="hint-text">Scan this QR code with your authenticator app:</p>
-            @if (totpQrCode(); as qrCode) {
-              <img
-                class="totp-qr"
-                [src]="'data:image/png;base64,' + qrCode"
-                alt="Scan with your authenticator app"
-                width="200"
-                height="200"
-              />
-            }
-            @if (totpSecret(); as secret) {
-              <p class="hint-text">Or enter this code manually: <code>{{ secret }}</code></p>
-            }
-
-            <form [formGroup]="totpCodeForm" (ngSubmit)="confirmTotpEnrollment()">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Code from your app</mat-label>
-                <input
-                  matInput
-                  type="text"
-                  inputmode="numeric"
-                  formControlName="code"
-                  autocomplete="one-time-code"
-                  maxlength="6"
-                />
-                @if (totpCodeForm.controls.code.hasError('required')) {
-                  <mat-error>Code is required.</mat-error>
-                } @else if (totpCodeForm.controls.code.hasError('pattern')) {
-                  <mat-error>Enter the 6-digit code.</mat-error>
-                }
-              </mat-form-field>
-
-              @if (totpError(); as message) {
-                <p class="error-text">{{ message }}</p>
-              }
-
-              <div class="actions">
-                <a (click)="cancelTotpEnrollment()">Cancel</a>
-                <button mat-flat-button color="primary" type="submit" [disabled]="twoFactorSaving()">
-                  Confirm
-                </button>
-              </div>
-            </form>
-          </div>
-        }
+        <div class="sign-in-method">{{ signInMethodLabel() }}</div>
+        <p class="hint-text">Manage this below, or turn on an authenticator app for the strongest option.</p>
       }
-    </mat-card-content>
-  </mat-card>
+    </div>
+  </div>
 
-  <mat-card class="delete-profile-card">
-<mat-card-header>
-      <mat-card-title>Delete Profile</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <p class="warning-text">
-        Deleting your profile is permanent and cannot be undone. All your data will be lost.
-      </p>
-      <button mat-flat-button color="warn" [disabled]="deleteInProgress()" (click)="onDeleteProfile()">
-        @if (deleteInProgress()) {
-          <mat-progress-spinner diameter="18" mode="indeterminate" />
-        } @else {
-          Delete Profile
+  <section class="profile-section">
+    <h2>Security</h2>
+    <p class="section-intro">
+      Choose one way to verify it's you when you sign in: an emailed code, or a code from an
+      authenticator app like Microsoft Authenticator or Google Authenticator.
+    </p>
+
+    @if (twoFactorLoading()) {
+      <mat-progress-spinner diameter="28" mode="indeterminate" />
+    } @else {
+      <mat-radio-group
+        class="method-grid"
+        [value]="twoFactorMethod()"
+        [disabled]="twoFactorSaving()"
+        (change)="onTwoFactorMethodChange($event)"
+      >
+        <mat-radio-button value="None">
+          <span class="method-label">Off</span>
+        </mat-radio-button>
+        <mat-radio-button value="Email">
+          <span class="method-label">Email code</span>
+        </mat-radio-button>
+        <mat-radio-button value="Totp">
+          <span class="method-label">Authenticator app</span>
+        </mat-radio-button>
+      </mat-radio-group>
+
+      @if (twoFactorError(); as message) {
+        <p class="error-text">{{ message }}</p>
+      }
+
+      @if (twoFactorMethod() !== 'None') {
+        <p class="hint-text">
+          {{ recoveryCodesRemaining() }} recovery code{{ recoveryCodesRemaining() === 1 ? '' : 's' }} remaining.
+        </p>
+        <button mat-stroked-button (click)="regenerateRecoveryCodes()">Regenerate recovery codes</button>
+      }
+
+      @if (recoveryCodes(); as codes) {
+        <div class="recovery-codes-reveal">
+          <p class="warning-text">
+            Save these recovery codes somewhere safe. Each one can be used once to sign in if you
+            lose access to your normal two-factor method. They won't be shown again.
+          </p>
+          <pre class="recovery-codes-list mono">{{ codes.join('\n') }}</pre>
+          <div class="actions">
+            <button mat-flat-button color="primary" (click)="downloadRecoveryCodes()">Download as .txt</button>
+            <button mat-flat-button color="primary" (click)="dismissRecoveryCodes()">Done</button>
+          </div>
+        </div>
+      }
+
+      @if (totpEnrollmentActive()) {
+        <div class="totp-setup">
+          <p class="hint-text">Scan this QR code with your authenticator app:</p>
+          @if (totpQrCode(); as qrCode) {
+            <img
+              class="totp-qr"
+              [src]="'data:image/png;base64,' + qrCode"
+              alt="Scan with your authenticator app"
+              width="200"
+              height="200"
+            />
+          }
+          @if (totpSecret(); as secret) {
+            <p class="hint-text">Or enter this code manually: <code class="mono">{{ secret }}</code></p>
+          }
+
+          <form [formGroup]="totpCodeForm" (ngSubmit)="confirmTotpEnrollment()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Code from your app</mat-label>
+              <input
+                matInput
+                type="text"
+                inputmode="numeric"
+                formControlName="code"
+                autocomplete="one-time-code"
+                maxlength="6"
+              />
+              @if (totpCodeForm.controls.code.hasError('required')) {
+                <mat-error>Code is required.</mat-error>
+              } @else if (totpCodeForm.controls.code.hasError('pattern')) {
+                <mat-error>Enter the 6-digit code.</mat-error>
+              }
+            </mat-form-field>
+
+            @if (totpError(); as message) {
+              <p class="error-text">{{ message }}</p>
+            }
+
+            <div class="actions">
+              <a (click)="cancelTotpEnrollment()">Cancel</a>
+              <button mat-flat-button color="primary" type="submit" [disabled]="twoFactorSaving()">
+                Confirm
+              </button>
+            </div>
+          </form>
+        </div>
+      }
+    }
+  </section>
+
+  <section class="profile-section">
+    <h3>Holders</h3>
+    @if (holders().length === 0) {
+      <p class="hint-text">No one has emergency access to your vault yet.</p>
+    } @else {
+      <ul class="holder-list">
+        @for (holder of holders(); track holder.id) {
+          <li>
+            <span class="holder-name">{{ holder.holderName }}</span>
+            <span class="mono holder-email">{{ holder.holderEmail }}</span>
+            <span class="tag" [class]="statusTagClass(holder.status)">{{ holder.status }}</span>
+          </li>
         }
-      </button>
+      </ul>
+    }
+    <a mat-stroked-button routerLink="/vault/sharing">Manage holders</a>
+  </section>
+
+  <section class="profile-section delete-section">
+    <div class="delete-copy">
+      <h3>Delete profile</h3>
+      <p>
+        Permanent. Deleting your profile destroys your vault's ciphertext, and because we hold no
+        key, nothing can be reconstructed afterwards - including for your holders.
+      </p>
       @if (deleteError(); as message) {
         <p class="error-text">{{ message }}</p>
       }
-    </mat-card-content>
-  </mat-card>
+    </div>
+    <button mat-flat-button color="primary" [disabled]="deleteInProgress()" (click)="onDeleteProfile()">
+      @if (deleteInProgress()) {
+        <mat-progress-spinner diameter="18" mode="indeterminate" />
+      } @else {
+        Delete profile
+      }
+    </button>
+  </section>
 </div>

@@ -1,28 +1,65 @@
+:host {
+  display: block;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
 .vault-page {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 28px 60px;
+}
+
+.item-header {
   display: flex;
-  flex-direction: column;
+  align-items: flex-end;
   gap: 16px;
+  padding-bottom: 24px;
+  margin-bottom: 8px;
+  border-bottom: 2px solid var(--color-divider);
+
+  h1 {
+    font-size: 34px;
+    letter-spacing: -0.03em;
+    margin: 8px 0 0;
+    font-family: var(--font-heading);
+    font-weight: 800;
+  }
 }
 
-.vault-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.item-dates {
+  color: var(--color-neutral-muted);
+  margin-top: 8px;
 }
 
-.field-list {
+.item-header-actions {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.item-section {
+  padding: 24px 0;
+  border-bottom: 2px solid var(--color-divider);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.section-label {
+  color: var(--color-neutral-muted);
+  margin-bottom: 12px;
+}
+
+.mono {
+  font-family: ui-monospace, Menlo, monospace;
 }
 
 .verify-card {
   max-width: 420px;
-  margin: 0 auto;
+  margin: 60px auto;
 
   form {
     display: flex;
@@ -31,14 +68,40 @@
   }
 }
 
-.field-row-view {
+.fields {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.field-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.field-row-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider);
+
+  &:last-child {
+    border-bottom: 0;
+  }
 
   dt {
-    font-size: 12px;
-    color: var(--mat-sys-on-surface-variant);
+    font-weight: 800;
   }
 
   dd {
@@ -49,31 +112,40 @@
   }
 }
 
-.attachments {
-  margin: 16px 0 0;
-
-  h3 {
-    font-size: 14px;
-    color: var(--mat-sys-on-surface-variant);
-    margin: 0 0 8px;
-  }
-}
-
 .attachment-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
 
   li {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-divider);
+
+    &:last-child {
+      border-bottom: 0;
+    }
 
     span {
       flex: 1;
+      font-weight: 800;
+      font-size: 14px;
     }
   }
+}
+
+.item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.edit-form {
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
 }

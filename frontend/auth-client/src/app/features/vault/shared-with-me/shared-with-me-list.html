@@ -1,7 +1,7 @@
 <div class="vault-page">
   <div class="vault-header">
-    <h1>Entire Vaults Shared with me</h1>
-    <a mat-button routerLink="/vault">Back to vault</a>
+    <h1>Vaults shared with me</h1>
+    <a mat-stroked-button routerLink="/vault">Back to vault</a>
   </div>
 
   @if (loading()) {
@@ -11,18 +11,14 @@
   } @else if (shares().length === 0) {
     <p>No one has shared their vault with you yet.</p>
   } @else {
-    <mat-card>
+    <section class="share-section">
       <app-search-query-bar [(searchQuery)]="sharesSearchQuery"></app-search-query-bar>
       <mat-list>
         @for (share of pagedShares(); track share.id) {
           <mat-list-item (click)="onItemClick(share)" class="vault-item" [class.disabled]="share.status === 'Failed'">
             <span matListItemTitle>{{ share.ownerName }}</span>
-            <span matListItemLine
-              >{{ share.ownerEmail }} &middot;
-              <span class="share-status" [class]="'status-' + share.status.toLowerCase()">{{
-                statusLabel(share.status)
-              }}</span></span
-            >
+            <span matListItemLine class="k">{{ share.ownerEmail }}</span>
+            <span matListItemMeta class="tag" [class]="statusTagClass(share.status)">{{ statusLabel(share.status) }}</span>
           </mat-list-item>
           @if (verifyingId() === share.id) {
             <form class="verify-form" [formGroup]="codeForm" (ngSubmit)="submitCode(share.id)">
@@ -65,23 +61,19 @@
         }
       </mat-list>
       <app-paginator [length]="filteredShares().length" [(pageIndex)]="sharesPageIndex" />
-    </mat-card>
+    </section>
   }
 
   @if (itemShares().length > 0) {
     <h2 class="section-heading">Items shared with me</h2>
-    <mat-card>
+    <section class="share-section">
       <app-search-query-bar [(searchQuery)]="itemSharesSearchQuery"></app-search-query-bar>
       <mat-list>
         @for (share of pagedItemShares(); track share.shareId) {
           <mat-list-item (click)="onItemShareClick(share)" class="vault-item" [class.disabled]="share.status === 'Failed'">
             <span matListItemTitle>{{ share.ownerName }}</span>
-            <span matListItemLine
-              >{{ share.ownerEmail }} &middot; {{ share.canEdit ? 'Can edit' : 'View only' }} &middot;
-              <span class="share-status" [class]="'status-' + share.status.toLowerCase()">{{
-                statusLabel(share.status)
-              }}</span></span
-            >
+            <span matListItemLine class="k">{{ share.ownerEmail }} &middot; {{ share.canEdit ? 'Can edit' : 'View only' }}</span>
+            <span matListItemMeta class="tag" [class]="statusTagClass(share.status)">{{ statusLabel(share.status) }}</span>
           </mat-list-item>
           @if (verifyingId() === share.shareId) {
             <form class="verify-form" [formGroup]="codeForm" (ngSubmit)="submitCode(share.shareId)">
@@ -124,6 +116,6 @@
         }
       </mat-list>
       <app-paginator [length]="filteredItemShares().length" [(pageIndex)]="itemSharesPageIndex" />
-    </mat-card>
+    </section>
   }
 </div>

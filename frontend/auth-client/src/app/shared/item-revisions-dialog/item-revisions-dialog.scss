@@ -7,7 +7,7 @@ mat-dialog-content mat-progress-spinner {
 }
 
 .editor-email {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--color-neutral-muted);
   font-size: 13px;
   margin: 0 0 12px;
 }
@@ -26,11 +26,11 @@ mat-dialog-content mat-progress-spinner {
 
   dt {
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--color-neutral-muted);
   }
 
   dd {
     margin: 0;
-    font-family: monospace;
+    font-family: ui-monospace, Menlo, monospace;
   }
 }

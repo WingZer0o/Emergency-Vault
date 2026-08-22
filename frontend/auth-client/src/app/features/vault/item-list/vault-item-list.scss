@@ -1,27 +1,94 @@
+:host {
+  display: block;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
 .vault-page {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding: 28px 28px 60px;
 }
 
 .vault-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--color-divider);
   flex-wrap: wrap;
-  gap: 12px;
+
+  h1 {
+    font-size: 38px;
+    letter-spacing: -0.03em;
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 800;
+  }
+}
+
+.vault-subline {
+  color: var(--color-neutral-muted);
+  margin-top: 6px;
 }
 
 .vault-header-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
-.vault-item {
+.vault-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.records-table {
+  width: 100%;
+  background: transparent;
+
+  .mat-mdc-header-row {
+    height: auto;
+  }
+
+  th.mat-mdc-header-cell {
+    font: 11px ui-monospace, Menlo, monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-neutral-muted);
+    border-bottom: 2px solid var(--color-divider);
+  }
+
+  td.mat-mdc-cell {
+    border-bottom: 1px solid var(--color-divider);
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+.record-label {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.record-updated {
+  color: var(--color-neutral-muted);
+  margin-top: 3px;
+}
+
+.record-row {
   cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  }
 }
 
+.actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
