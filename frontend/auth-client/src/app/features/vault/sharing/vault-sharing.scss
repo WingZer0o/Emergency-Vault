@@ -1,34 +1,85 @@
+:host {
+  display: block;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
 .vault-page {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding: 28px 28px 60px;
 }
 
 .vault-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  margin-bottom: 8px;
+  border-bottom: 2px solid var(--color-divider);
+
+  h1 {
+    font-size: 38px;
+    letter-spacing: -0.03em;
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 800;
+  }
 }
 
-.share-status {
-  font-size: 0.9em;
+.share-section {
+  padding: 24px 0;
+  border-bottom: 2px solid var(--color-divider);
+
+  h2 {
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+    font-family: var(--font-heading);
+    font-weight: 800;
+  }
+
+  &:last-child {
+    border-bottom: 0;
+  }
 }
 
-.status-active {
-  color: var(--mat-sys-primary);
+.section-intro {
+  font-size: 14px;
+  margin: 0 0 16px;
 }
 
-.status-pending {
-  color: var(--mat-sys-on-surface-variant);
+.mono {
+  font-family: ui-monospace, Menlo, monospace;
 }
 
-.status-codeexpired {
-  color: var(--mat-sys-tertiary);
+.holder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-divider);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
 }
 
-.status-failed {
-  color: var(--mat-sys-error);
+.holder-name {
+  font-weight: 800;
+}
+
+.holder-email {
+  color: var(--color-neutral-muted);
+  font-size: 12px;
+  margin-right: auto;
 }

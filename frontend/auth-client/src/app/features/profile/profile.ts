@@ -1,19 +1,18 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatListModule } from '@angular/material/list';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioChange, MatRadioModule } from '@angular/material/radio';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 
 import { AuthService } from '../../core/services/auth.service';
+import { VaultService } from '../../core/services/vault.service';
 import { VaultSessionService } from '../../core/services/vault-session.service';
 import { UserProfile } from '../../core/models/auth.models';
 import { TwoFactorMethodName } from '../../core/models/auth.models';
+import { VaultShareDto, VaultShareStatus } from '../../core/models/vault.models';
 import { MatButtonModule } from '@angular/material/button';
 import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { extractErrorMessage } from '../auth/auth-error.util';
@@ -21,10 +20,8 @@ import { extractErrorMessage } from '../auth/auth-error.util';
 @Component({
   selector: 'app-profile',
   imports: [
-    MatCardModule,
-    MatListModule,
+    RouterLink,
     MatButtonModule,
-    MatChipsModule,
     MatProgressSpinnerModule,
     MatRadioModule,
     MatFormFieldModule,
@@ -37,6 +34,7 @@ import { extractErrorMessage } from '../auth/auth-error.util';
 export class Profile implements OnInit {
   private readonly http = inject(HttpClient);
   protected readonly authService = inject(AuthService);
+  private readonly vaultService = inject(VaultService);
   private readonly vaultSession = inject(VaultSessionService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly router = inject(Router);
@@ -44,6 +42,10 @@ export class Profile implements OnInit {
 
   readonly users = signal<UserProfile[] | null>(null);
   readonly usersLoading = signal(false);
+
+  /** Whole-vault emergency-access holders - real data already served by VaultService.getShares(),
+   * not previously surfaced on this screen. Managed in full on /vault/sharing; this is a summary. */
+  readonly holders = signal<VaultShareDto[]>([]);
 
   readonly twoFactorMethod = signal<TwoFactorMethodName>('None');
   readonly twoFactorLoading = signal(true);
@@ -70,6 +72,37 @@ export class Profile implements OnInit {
 
   ngOnInit(): void {
     this.loadTwoFactorStatus();
+    this.loadHolders();
+  }
+
+  signInMethodLabel(): string {
+    switch (this.twoFactorMethod()) {
+      case 'Totp':
+        return 'Authenticator app';
+      case 'Email':
+        return 'Email code';
+      default:
+        return 'Password only';
+    }
+  }
+
+  statusTagClass(status: VaultShareStatus): string {
+    switch (status) {
+      case 'Active':
+        return 'tag-accent';
+      case 'Failed':
+        return 'tag-outline';
+      default:
+        return 'tag-neutral';
+    }
+  }
+
+  private loadHolders(): void {
+    this.vaultService.getShares().subscribe({
+      next: (shares) => this.holders.set(shares),
+      // Non-critical - manage-holders is still fully usable at /vault/sharing if this fails.
+      error: () => {},
+    });
   }
 
   onTwoFactorMethodChange(event: MatRadioChange): void {

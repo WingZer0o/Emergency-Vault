@@ -5,3 +5,9 @@ mat-dialog-content p {
 mat-dialog-content mat-progress-spinner {
   margin: 16px auto;
 }
+
+mat-list-item [matListItemLine] {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--color-neutral-muted);
+}

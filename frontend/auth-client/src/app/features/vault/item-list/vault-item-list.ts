@@ -1,44 +1,33 @@
 import { Component, OnInit, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTableModule } from '@angular/material/table';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
 import { DecryptedVaultItem, VaultItemPayload } from '../../../core/models/vault.models';
 import { PaginationService } from '../../../core/services/pagination.service';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { relativeTime } from '../../../core/utils/relative-time.util';
 import { ItemViewersDialog } from '../../../shared/item-viewers-dialog/item-viewers-dialog';
 import { Paginator } from '../../../shared/paginator/paginator';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
-import { MatRippleModule } from '@angular/material/core';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { FormsModule } from '@angular/forms';
 import { SearchQueryBar } from '../../../components/search-query-bar/search-query-bar';
 
 @Component({
   selector: 'app-vault-item-list',
   imports: [
     RouterLink,
-    MatCardModule,
     MatButtonModule,
     MatDialogModule,
-    MatDividerModule,
     MatIconModule,
-    MatListModule,
     MatProgressSpinnerModule,
+    MatTableModule,
     Paginator,
-    MatRippleModule,
-    MatFormFieldModule,
-    MatInputModule,
-    FormsModule,
     SearchQueryBar,
   ],
   templateUrl: './vault-item-list.html',
@@ -66,8 +55,14 @@ export class VaultItemList implements OnInit {
   readonly pageIndex = linkedSignal({ source: this.searchQuery, computation: () => 0 });
   readonly pagedItems = this.pagination.slice(this.filteredItems, this.pageIndex);
 
+  readonly displayedColumns = ['record', 'type', 'actions'];
+
   ngOnInit(): void {
     this.loadItems();
+  }
+
+  updatedLabel(item: DecryptedVaultItem): string {
+    return `Updated ${relativeTime(item.updatedAt)}`;
   }
 
   deleteItem(id: string, event: Event): void {

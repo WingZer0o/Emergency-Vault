@@ -1,62 +1,59 @@
 <div class="billing-page">
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title>Membership</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      @if (loading()) {
-        <mat-progress-spinner diameter="32" mode="indeterminate" />
-      } @else if (status(); as status) {
-        @if (justCanceled()) {
-          <p class="hint-text">Checkout was canceled - no charge was made.</p>
-        }
+  <div class="billing-header">
+    <h1>Membership</h1>
+  </div>
 
-        @if (status.hasAccess) {
-          <mat-chip-set>
-            @if (status.isFreeAccess) {
-              <mat-chip color="primary">Free access</mat-chip>
-            } @else {
-              <mat-chip color="primary">Active</mat-chip>
-            }
-          </mat-chip-set>
-          @if (status.currentPeriodEnd) {
-            <p class="hint-text">Renews {{ status.currentPeriodEnd | date: 'longDate' }}.</p>
-          }
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (status(); as status) {
+    @if (justCanceled()) {
+      <p class="hint-text">Checkout was canceled - no charge was made.</p>
+    }
+
+    @if (status.hasAccess) {
+      <div class="billing-tags">
+        @if (status.isFreeAccess) {
+          <span class="tag tag-accent">Free access</span>
         } @else {
-          @if (justSucceeded()) {
-            <p class="hint-text">
-              Payment received - activating your membership. This can take a few seconds.
-            </p>
-            <button mat-stroked-button (click)="refresh()">Refresh status</button>
-          } @else {
-            <p>
-              Access to Emergency Vault requires an active {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
-              membership.
-            </p>
-            <button mat-raised-button color="primary" [disabled]="starting()" (click)="subscribe()">
-              @if (starting()) {
-                <mat-progress-spinner diameter="18" mode="indeterminate" />
-              } @else {
-                Subscribe - {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
-              }
-            </button>
-          }
+          <span class="tag tag-accent">Active</span>
         }
-
-        @if (status.hasStripeCustomer) {
-          <button mat-stroked-button [disabled]="openingPortal()" (click)="openPortal()">
-            @if (openingPortal()) {
-              <mat-progress-spinner diameter="18" mode="indeterminate" />
-            } @else {
-              Manage billing
-            }
-          </button>
-        }
-
-        @if (errorMessage(); as message) {
-          <p class="error-text">{{ message }}</p>
-        }
+      </div>
+      @if (status.currentPeriodEnd) {
+        <p class="hint-text">Renews {{ status.currentPeriodEnd | date: 'longDate' }}.</p>
       }
-    </mat-card-content>
-  </mat-card>
+    } @else {
+      @if (justSucceeded()) {
+        <p class="hint-text">
+          Payment received - activating your membership. This can take a few seconds.
+        </p>
+        <button mat-stroked-button (click)="refresh()">Refresh status</button>
+      } @else {
+        <p>
+          Access to Emergency Vault requires an active {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
+          membership.
+        </p>
+        <button mat-flat-button color="primary" [disabled]="starting()" (click)="subscribe()">
+          @if (starting()) {
+            <mat-progress-spinner diameter="18" mode="indeterminate" />
+          } @else {
+            Subscribe - {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
+          }
+        </button>
+      }
+    }
+
+    @if (status.hasStripeCustomer) {
+      <button mat-stroked-button [disabled]="openingPortal()" (click)="openPortal()">
+        @if (openingPortal()) {
+          <mat-progress-spinner diameter="18" mode="indeterminate" />
+        } @else {
+          Manage billing
+        }
+      </button>
+    }
+
+    @if (errorMessage(); as message) {
+      <p class="error-text">{{ message }}</p>
+    }
+  }
 </div>

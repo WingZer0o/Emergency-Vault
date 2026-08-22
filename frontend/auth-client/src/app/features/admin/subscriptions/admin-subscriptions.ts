@@ -1,7 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -12,14 +9,7 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
 
 @Component({
   selector: 'app-admin-subscriptions',
-  imports: [
-    MatCardModule,
-    MatListModule,
-    MatDividerModule,
-    MatChipsModule,
-    MatProgressSpinnerModule,
-    MatSlideToggleModule,
-  ],
+  imports: [MatListModule, MatProgressSpinnerModule, MatSlideToggleModule],
   templateUrl: './admin-subscriptions.html',
   styleUrl: './admin-subscriptions.scss',
 })

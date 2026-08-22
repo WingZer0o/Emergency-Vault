@@ -31,6 +31,10 @@
   --color-accent-tint: light-dark(#fff2ef, #7c1405);
   --color-accent-on-tint: light-dark(#7c1405, #fff2ef);
 
+  // A step above --color-bg for recessed panels (right rails, secondary panels) - distinct from
+  // --color-neutral-tint, which is a tag fill, not a page-sized surface.
+  --color-surface: light-dark(#f8f4f4, #2a2726);
+
   --font-heading: 'Archivo', system-ui, sans-serif;
   --font-body: 'Archivo', system-ui, sans-serif;
 }
@@ -158,4 +162,12 @@
     padding: 8px;
     border-bottom: 1px solid var(--color-divider);
   }
+}
+
+// Uppercase mono section label ("Fields", "Attachments", "Security") used throughout the
+// authenticated screens in place of a mat-card-title.
+.k {
+  font: 10.5px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
