@@ -806,7 +806,7 @@ public class VaultService(
             return ServiceResult.Failure("Invalid or expired code. Request a new one.");
         }
 
-        if (!hotpService.VerifyCode(share.VerificationSecret, code, share.VerificationCounter))
+        if (!hotpService.VerifyCode(share.VerificationSecret, code, challenge.Counter))
         {
             var attempts = challenge.Attempts + 1;
             if (attempts >= _vaultShareCodesOptions.MaxAttempts)
