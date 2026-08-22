@@ -8,11 +8,14 @@ import {
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
+  RecoveryCodesResponse,
   RegisterRequest,
   ResetPasswordRequest,
   TotpEnrollment,
+  TwoFactorActivationResponse,
   TwoFactorStatus,
   UserProfile,
+  VerifyTwoFactorRecoveryRequest,
   VerifyTwoFactorRequest,
 } from '../models/auth.models';
 
@@ -60,6 +63,12 @@ export class AuthService {
       .pipe(tap((response) => this.setSession(response)));
   }
 
+  verifyTwoFactorRecoveryCode(request: VerifyTwoFactorRecoveryRequest): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(`${this.baseUrl}/login/two-factor/recovery`, request)
+      .pipe(tap((response) => this.setSession(response)));
+  }
+
   resendTwoFactorCode(twoFactorToken: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/login/two-factor/resend`, { twoFactorToken });
   }
@@ -68,8 +77,8 @@ export class AuthService {
     return this.http.get<TwoFactorStatus>(`${this.baseUrl}/two-factor/status`);
   }
 
-  enableTwoFactor(): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.baseUrl}/two-factor/enable`, {});
+  enableTwoFactor(): Observable<TwoFactorActivationResponse> {
+    return this.http.post<TwoFactorActivationResponse>(`${this.baseUrl}/two-factor/enable`, {});
   }
 
   disableTwoFactor(): Observable<{ message: string }> {
@@ -80,8 +89,12 @@ export class AuthService {
     return this.http.post<TotpEnrollment>(`${this.baseUrl}/two-factor/totp/setup`, {});
   }
 
-  confirmTotpEnrollment(code: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.baseUrl}/two-factor/totp/confirm`, { code });
+  confirmTotpEnrollment(code: string): Observable<TwoFactorActivationResponse> {
+    return this.http.post<TwoFactorActivationResponse>(`${this.baseUrl}/two-factor/totp/confirm`, { code });
+  }
+
+  regenerateRecoveryCodes(): Observable<RecoveryCodesResponse> {
+    return this.http.post<RecoveryCodesResponse>(`${this.baseUrl}/two-factor/recovery-codes/regenerate`, {});
   }
 
   refresh(): Observable<AuthResponse> {

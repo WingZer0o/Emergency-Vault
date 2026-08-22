@@ -183,6 +183,60 @@ public class AuthService(
         return ServiceResult<AuthResult>.Success(result);
     }
 
+    public async Task<ServiceResult<AuthResult>> VerifyTwoFactorRecoveryCodeAsync(string challengeToken, string recoveryCode, string? ipAddress, CancellationToken ct)
+    {
+        var challenge = await twoFactorChallengeCache.GetAsync(challengeToken, ct);
+        if (challenge is null)
+        {
+            return ServiceResult<AuthResult>.Failure("Invalid or expired code. Please log in again.");
+        }
+
+        var user = await userManager.FindByIdAsync(challenge.UserId.ToString());
+        if (user is null || user.TwoFactorMethod == TwoFactorMethod.None)
+        {
+            await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult<AuthResult>.Failure("Invalid or expired code. Please log in again.");
+        }
+
+        if (await userManager.IsLockedOutAsync(user))
+        {
+            await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+            return ServiceResult<AuthResult>.Failure("Account is temporarily locked due to repeated failed attempts.");
+        }
+
+        var redeemResult = await userManager.RedeemTwoFactorRecoveryCodeAsync(user, recoveryCode);
+        if (!redeemResult.Succeeded)
+        {
+            await userManager.AccessFailedAsync(user);
+            if (await userManager.IsLockedOutAsync(user))
+            {
+                await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+                await RecordFailedLoginAsync(user.Id, user.Email!, "LockedOut", ipAddress, ct);
+                await SendAccountLockedEmailAsync(user, ct);
+                return ServiceResult<AuthResult>.Failure("Account is temporarily locked due to repeated failed attempts.");
+            }
+
+            await RecordFailedLoginAsync(user.Id, user.Email!, "InvalidRecoveryCode", ipAddress, ct);
+
+            if (challenge.Attempts + 1 >= _two2FACodesOptions.MaxAttempts)
+            {
+                await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+                return ServiceResult<AuthResult>.Failure("Too many incorrect attempts. Please log in again.");
+            }
+
+            await twoFactorChallengeCache.SetAsync(
+                challengeToken, challenge with { Attempts = challenge.Attempts + 1 }, _two2FACodesOptions.TwoFactorChallengeTtl, ct);
+            return ServiceResult<AuthResult>.Failure("Incorrect or already-used recovery code.");
+        }
+
+        await twoFactorChallengeCache.RemoveAsync(challengeToken, ct);
+        await userManager.ResetAccessFailedCountAsync(user);
+        await NotifyIfNewIpAsync(user, ipAddress, ct);
+        await emailSender.SendRecoveryCodeUsedAsync(user.Email!, ipAddress, DateTimeOffset.UtcNow, ct);
+        var result = await IssueTokenPairAsync(user, ipAddress, ct);
+        return ServiceResult<AuthResult>.Success(result);
+    }
+
     public async Task<ServiceResult> ResendTwoFactorCodeAsync(string challengeToken, CancellationToken ct)
     {
         var challenge = await twoFactorChallengeCache.GetAsync(challengeToken, ct);
@@ -212,16 +266,21 @@ public class AuthService(
     public async Task<TwoFactorStatusResult> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());
-        var method = user?.TwoFactorMethod ?? TwoFactorMethod.None;
-        return new TwoFactorStatusResult(method != TwoFactorMethod.None, method);
+        if (user is null)
+        {
+            return new TwoFactorStatusResult(false, TwoFactorMethod.None, 0);
+        }
+
+        var remaining = await userManager.CountRecoveryCodesAsync(user);
+        return new TwoFactorStatusResult(user.TwoFactorMethod != TwoFactorMethod.None, user.TwoFactorMethod, remaining);
     }
 
-    public async Task<ServiceResult> EnableTwoFactorAsync(Guid userId, CancellationToken ct)
+    public async Task<ServiceResult<TwoFactorActivationResult>> EnableTwoFactorAsync(Guid userId, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());
         if (user is null)
         {
-            return ServiceResult.Failure("User not found.");
+            return ServiceResult<TwoFactorActivationResult>.Failure("User not found.");
         }
 
         if (string.IsNullOrEmpty(user.TwoFactorSecret))
@@ -235,7 +294,13 @@ public class AuthService(
         user.TwoFactorMethod = TwoFactorMethod.Email;
 
         var result = await userManager.SetTwoFactorEnabledAsync(user, true);
-        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+        if (!result.Succeeded)
+        {
+            return ServiceResult<TwoFactorActivationResult>.Failure(result.Errors.Select(e => e.Description).ToArray());
+        }
+
+        var recoveryCodes = await EnsureRecoveryCodesAsync(user);
+        return ServiceResult<TwoFactorActivationResult>.Success(new TwoFactorActivationResult(recoveryCodes));
     }
 
     public async Task<ServiceResult> DisableTwoFactorAsync(Guid userId, CancellationToken ct)
@@ -252,7 +317,43 @@ public class AuthService(
         user.TwoFactorMethod = TwoFactorMethod.None;
 
         var result = await userManager.SetTwoFactorEnabledAsync(user, false);
-        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+        if (!result.Succeeded)
+        {
+            return ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+        }
+
+        // Recovery codes are meaningless with no active method - a later re-enable generates a fresh batch.
+        await userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 0);
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult<RecoveryCodesResult>> RegenerateRecoveryCodesAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ServiceResult<RecoveryCodesResult>.Failure("User not found.");
+        }
+
+        if (user.TwoFactorMethod == TwoFactorMethod.None)
+        {
+            return ServiceResult<RecoveryCodesResult>.Failure("Enable two-factor authentication first.");
+        }
+
+        var codes = await userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        return ServiceResult<RecoveryCodesResult>.Success(new RecoveryCodesResult(codes?.ToList() ?? []));
+    }
+
+    /// <summary>Generates a first batch of recovery codes the moment 2FA is newly turned on. A later method switch (Email &lt;-&gt; Totp) keeps the existing batch - only DisableTwoFactorAsync clears it.</summary>
+    private async Task<IReadOnlyList<string>?> EnsureRecoveryCodesAsync(ApplicationUser user)
+    {
+        if (await userManager.CountRecoveryCodesAsync(user) > 0)
+        {
+            return null;
+        }
+
+        var codes = await userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        return codes?.ToList();
     }
 
     public async Task<ServiceResult<TotpEnrollmentResult>> StartTotpEnrollmentAsync(Guid userId, CancellationToken ct)
@@ -275,17 +376,17 @@ public class AuthService(
         return ServiceResult<TotpEnrollmentResult>.Success(new TotpEnrollmentResult(secret, qrCodePng));
     }
 
-    public async Task<ServiceResult> ConfirmTotpEnrollmentAsync(Guid userId, string code, CancellationToken ct)
+    public async Task<ServiceResult<TwoFactorActivationResult>> ConfirmTotpEnrollmentAsync(Guid userId, string code, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());
         if (user is null || string.IsNullOrEmpty(user.TotpSecret))
         {
-            return ServiceResult.Failure("No pending authenticator app enrollment. Start setup again.");
+            return ServiceResult<TwoFactorActivationResult>.Failure("No pending authenticator app enrollment. Start setup again.");
         }
 
         if (!totpService.VerifyCode(user.TotpSecret, code))
         {
-            return ServiceResult.Failure("Incorrect code. Please try again.");
+            return ServiceResult<TwoFactorActivationResult>.Failure("Incorrect code. Please try again.");
         }
 
         // Mutual exclusivity: activating the authenticator app clears the email-HOTP secret.
@@ -294,7 +395,13 @@ public class AuthService(
         user.TwoFactorMethod = TwoFactorMethod.Totp;
 
         var result = await userManager.SetTwoFactorEnabledAsync(user, true);
-        return result.Succeeded ? ServiceResult.Success() : ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+        if (!result.Succeeded)
+        {
+            return ServiceResult<TwoFactorActivationResult>.Failure(result.Errors.Select(e => e.Description).ToArray());
+        }
+
+        var recoveryCodes = await EnsureRecoveryCodesAsync(user);
+        return ServiceResult<TwoFactorActivationResult>.Success(new TwoFactorActivationResult(recoveryCodes));
     }
 
     private async Task RecordFailedLoginAsync(Guid? userId, string email, string reason, string? ipAddress, CancellationToken ct)
