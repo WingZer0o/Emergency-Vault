@@ -1,0 +1,19 @@
+// mat-card-header projects the title into its own .mat-mdc-card-header-text div, which is a flex
+// item with no flex-grow - so it collapses to the search field's intrinsic width no matter how
+// wide the card is. ::ng-deep is needed because that div belongs to MatCardHeader's template
+// rather than this one; the mat-card-header prefix keeps the override scoped to this component.
+mat-card-header ::ng-deep .mat-mdc-card-header-text {
+  min-width: 0;
+}
+
+mat-card-header form {
+  min-width: 150px;
+  max-width: 500px;
+  width: 100%;
+}
+
+// mat-form-field is display: inline-flex, so it shrinks to its content until given a width. Once
+// it has one, the infix inside it (flex: auto, width: 180px) grows to fill the rest.
+mat-card-header mat-form-field {
+  width: 100%;
+}
