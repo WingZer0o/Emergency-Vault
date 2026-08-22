@@ -38,6 +38,27 @@
           <p class="error-text">{{ message }}</p>
         }
 
+        @if (twoFactorMethod() !== 'None') {
+          <p class="hint-text">
+            {{ recoveryCodesRemaining() }} recovery code{{ recoveryCodesRemaining() === 1 ? '' : 's' }} remaining.
+          </p>
+          <button mat-flat-button color="primary" (click)="regenerateRecoveryCodes()">Regenerate recovery codes</button>
+        }
+
+        @if (recoveryCodes(); as codes) {
+          <div class="recovery-codes-reveal">
+            <p class="warning-text">
+              Save these recovery codes somewhere safe. Each one can be used once to sign in if you
+              lose access to your normal two-factor method. They won't be shown again.
+            </p>
+            <pre class="recovery-codes-list">{{ codes.join('\n') }}</pre>
+            <div class="actions">
+              <button mat-flat-button color="primary" (click)="downloadRecoveryCodes()">Download as .txt</button>
+              <button mat-flat-button color="primary" (click)="dismissRecoveryCodes()">Done</button>
+            </div>
+          </div>
+        }
+
         @if (totpEnrollmentActive()) {
           <div class="totp-setup">
             <p class="hint-text">Scan this QR code with your authenticator app:</p>
@@ -97,7 +118,7 @@
       <p class="warning-text">
         Deleting your profile is permanent and cannot be undone. All your data will be lost.
       </p>
-      <button mat-raised-button color="warn" [disabled]="deleteInProgress()" (click)="onDeleteProfile()">
+      <button mat-flat-button color="warn" [disabled]="deleteInProgress()" (click)="onDeleteProfile()">
         @if (deleteInProgress()) {
           <mat-progress-spinner diameter="18" mode="indeterminate" />
         } @else {

@@ -79,6 +79,22 @@ public class EmailJobs
         await SendEmailAsync(body);
     }
 
+    public async Task SendRecoveryCodeUsedAsync(string toEmail, string? ipAddress, DateTimeOffset usedAt)
+    {
+        var ipClause = string.IsNullOrEmpty(ipAddress) ? string.Empty : $" from IP address <strong>{ipAddress}</strong>";
+        EmailRequestBody body = new EmailRequestBody()
+        {
+            From = "support@emergencyvault.net",
+            To = new List<string> { toEmail },
+            Subject = "A recovery code was used to sign in",
+            Html = $"<p>One of your two-factor recovery codes was just used to sign in{ipClause} " +
+                   $"at {usedAt.UtcDateTime:yyyy-MM-dd HH:mm} UTC.</p>" +
+                   "<p>If this was you and you've lost access to your normal two-factor method, sign in and set it up again " +
+                   "with a new device. If this wasn't you, reset your password immediately and regenerate your recovery codes.</p>"
+        };
+        await SendEmailAsync(body);
+    }
+
     public async Task SendVaultShareCodeAsync(string toEmail, string code, string ownerDisplayName)
     {
         EmailRequestBody body = new EmailRequestBody()

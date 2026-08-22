@@ -49,6 +49,11 @@ export class Profile implements OnInit {
   readonly twoFactorLoading = signal(true);
   readonly twoFactorSaving = signal(false);
   readonly twoFactorError = signal<string | null>(null);
+  readonly recoveryCodesRemaining = signal(0);
+
+  /** Non-null only right after a fresh batch is generated - the one moment codes are visible in plaintext. */
+  readonly recoveryCodes = signal<string[] | null>(null);
+  readonly recoveryCodesSaving = signal(false);
 
   /** True while the "Authenticator app" enrollment panel (QR + confirmation code) is open. */
   readonly totpEnrollmentActive = signal(false);
@@ -83,10 +88,25 @@ export class Profile implements OnInit {
     this.cancelTotpEnrollment();
     this.twoFactorSaving.set(true);
 
-    const request = method === 'Email' ? this.authService.enableTwoFactor() : this.authService.disableTwoFactor();
-    request.subscribe({
-      next: () => {
+    if (method === 'None') {
+      this.authService.disableTwoFactor().subscribe({
+        next: () => {
+          this.twoFactorMethod.set(method);
+          this.recoveryCodesRemaining.set(0);
+          this.twoFactorSaving.set(false);
+        },
+        error: () => {
+          this.twoFactorSaving.set(false);
+          this.twoFactorError.set('Could not update two-factor authentication. Please try again.');
+        },
+      });
+      return;
+    }
+
+    this.authService.enableTwoFactor().subscribe({
+      next: ({ recoveryCodes }) => {
         this.twoFactorMethod.set(method);
+        this.applyNewRecoveryCodes(recoveryCodes);
         this.twoFactorSaving.set(false);
       },
       error: () => {
@@ -106,8 +126,9 @@ export class Profile implements OnInit {
     this.totpError.set(null);
 
     this.authService.confirmTotpEnrollment(this.totpCodeForm.getRawValue().code).subscribe({
-      next: () => {
+      next: ({ recoveryCodes }) => {
         this.twoFactorMethod.set('Totp');
+        this.applyNewRecoveryCodes(recoveryCodes);
         this.twoFactorSaving.set(false);
         this.cancelTotpEnrollment();
       },
@@ -116,6 +137,64 @@ export class Profile implements OnInit {
         this.totpError.set(extractErrorMessage(err, 'Incorrect code.'));
       },
     });
+  }
+
+  regenerateRecoveryCodes(): void {
+    this.confirmDialog
+      .confirm({
+        title: 'Regenerate recovery codes',
+        message: 'Your existing recovery codes will stop working immediately. Make sure you can save the new ones.',
+        confirmText: 'Regenerate',
+        danger: true,
+      })
+      .subscribe((confirmed) => {
+        if (confirmed) {
+          this.doRegenerateRecoveryCodes();
+        }
+      });
+  }
+
+  /** Client-side only - the codes were already persisted server-side, this just downloads the one-time view as a file. */
+  downloadRecoveryCodes(): void {
+    const codes = this.recoveryCodes();
+    if (!codes) {
+      return;
+    }
+
+    const blob = new Blob([codes.join('\n') + '\n'], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'emergencyvault-recovery-codes.txt';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  dismissRecoveryCodes(): void {
+    this.recoveryCodes.set(null);
+  }
+
+  private doRegenerateRecoveryCodes(): void {
+    this.recoveryCodesSaving.set(true);
+    this.twoFactorError.set(null);
+
+    this.authService.regenerateRecoveryCodes().subscribe({
+      next: ({ codes }) => {
+        this.recoveryCodesSaving.set(false);
+        this.applyNewRecoveryCodes(codes);
+      },
+      error: () => {
+        this.recoveryCodesSaving.set(false);
+        this.twoFactorError.set('Could not regenerate recovery codes. Please try again.');
+      },
+    });
+  }
+
+  private applyNewRecoveryCodes(codes: string[] | undefined): void {
+    if (codes && codes.length > 0) {
+      this.recoveryCodes.set(codes);
+      this.recoveryCodesRemaining.set(codes.length);
+    }
   }
 
   cancelTotpEnrollment(): void {
@@ -147,8 +226,9 @@ export class Profile implements OnInit {
   private loadTwoFactorStatus(): void {
     this.twoFactorLoading.set(true);
     this.authService.getTwoFactorStatus().subscribe({
-      next: ({ method }) => {
+      next: ({ method, recoveryCodesRemaining }) => {
         this.twoFactorMethod.set(method);
+        this.recoveryCodesRemaining.set(recoveryCodesRemaining);
         this.twoFactorLoading.set(false);
       },
       error: () => this.twoFactorLoading.set(false),

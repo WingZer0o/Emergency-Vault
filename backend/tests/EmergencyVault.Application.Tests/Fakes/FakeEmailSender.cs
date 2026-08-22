@@ -12,6 +12,7 @@ public class FakeEmailSender : IEmailSender
     public Task SendTwoFactorCodeAsync(string toEmail, string code, CancellationToken ct) => Task.CompletedTask;
     public Task SendAccountLockedAsync(string toEmail, string unlockLink, CancellationToken ct) => Task.CompletedTask;
     public Task SendNewIpLoginAsync(string toEmail, string ipAddress, DateTimeOffset loggedInAt, CancellationToken ct) => Task.CompletedTask;
+    public Task SendRecoveryCodeUsedAsync(string toEmail, string? ipAddress, DateTimeOffset usedAt, CancellationToken ct) => Task.CompletedTask;
 
     public Task SendVaultShareCodeAsync(string toEmail, string code, string ownerDisplayName, CancellationToken ct)
     {
