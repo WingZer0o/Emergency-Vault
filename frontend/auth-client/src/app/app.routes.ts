@@ -124,5 +124,5 @@ export const routes: Routes = [
     canActivate: [authGuard, subscriptionGuard, vaultUnlockedGuard],
     loadComponent: () => import('./features/vault/item-list/vault-item-list').then((m) => m.VaultItemList),
   },
-  { path: '**', redirectTo: 'dashboard' },
+  { path: '**', redirectTo: 'vault' },
 ];

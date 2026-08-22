@@ -1,212 +1,189 @@
 <div class="vault-page">
-  <mat-card class="item-form-card">
-    <mat-card-header>
-      <mat-card-title
-        >{{ editing() ? 'Edit item' : form.controls.label.value || 'Vault item' }}
-      </mat-card-title>
-      <button mat-button class="view-history-button" type="button" (click)="viewHistory()">
-        <mat-icon>history</mat-icon>
-        History
-      </button>
-    </mat-card-header>
-    <mat-card-content>
-      @if (loading()) {
-        <mat-progress-spinner diameter="32" mode="indeterminate" />
-      } @else if (!editing()) {
-        <dl class="field-list">
-          @for (field of fields.controls; track $index) {
-            <div class="field-row-view">
-              <dt>{{ field.value.name }}</dt>
-              <dd>
-                <span>{{ isRevealed($index) ? field.value.value : '••••••••' }}</span>
-                <button
-                  mat-icon-button
-                  type="button"
-                  (click)="toggleReveal($index)"
-                  aria-label="Toggle visibility"
-                >
-                  <mat-icon>{{ isRevealed($index) ? 'visibility_off' : 'visibility' }}</mat-icon>
-                </button>
-                <button
-                  mat-icon-button
-                  type="button"
-                  (click)="copyValue(field.value.value ?? '')"
-                  aria-label="Copy value"
-                >
-                  <mat-icon>content_copy</mat-icon>
-                </button>
-              </dd>
-            </div>
-          }
-        </dl>
-
-        <div class="attachments">
-          <h3>Attachments</h3>
-
-          @if (attachments().length > 0) {
-            <ul class="attachment-list">
-              @for (attachment of attachments(); track attachment.id) {
-                <li>
-                  <mat-icon>description</mat-icon>
-                  <span>{{ attachment.fileName }}</span>
-                  <button
-                    mat-icon-button
-                    type="button"
-                    (click)="downloadAttachment(attachment)"
-                    [disabled]="downloadingId() === attachment.id"
-                    aria-label="Download file"
-                  >
-                    <mat-icon>download</mat-icon>
-                  </button>
-                  <button
-                    mat-icon-button
-                    type="button"
-                    (click)="deleteAttachment(attachment)"
-                    aria-label="Delete file"
-                  >
-                    <mat-icon>delete_outline</mat-icon>
-                  </button>
-                </li>
-              }
-            </ul>
-          }
-
-          <input
-            #fileInput
-            type="file"
-            multiple
-            accept=".pdf,.docx"
-            hidden
-            (change)="addFiles(fileInput.files); fileInput.value = ''"
-          />
-          <button mat-stroked-button type="button" (click)="fileInput.click()">
-            <mat-icon>attach_file</mat-icon>
-            Attach PDF or DOCX
-          </button>
-
-          @if (uploadingLabel(); as label) {
-            <p class="uploading-text">
-              <mat-progress-spinner diameter="16" mode="indeterminate" />
-              Uploading {{ label }}…
-            </p>
-          }
-        </div>
-
-        <div class="item-shares">
-          <h3>Shared with</h3>
-
-          @if (itemShares().length === 0) {
-            <p class="hint-text">Not shared with anyone individually.</p>
-          } @else {
-            <mat-list>
-              @for (share of itemShares(); track share.id) {
-                <mat-list-item>
-                  <span matListItemTitle>{{ share.holderName }}</span>
-                  <span matListItemLine
-                    >{{ share.holderEmail }} &middot;
-                    {{ share.canEdit ? 'Can edit' : 'View only' }}</span
-                  >
-                  <button
-                    mat-icon-button
-                    matListItemMeta
-                    (click)="revokeItemShare(share.id)"
-                    aria-label="Revoke access"
-                  >
-                    <mat-icon>person_remove</mat-icon>
-                  </button>
-                </mat-list-item>
-              }
-            </mat-list>
-          }
-
-          <button mat-stroked-button type="button" [disabled]="sharingItem()" (click)="shareItem()">
-            @if (sharingItem()) {
-              <mat-progress-spinner diameter="20" mode="indeterminate" />
-            } @else {
-              <ng-container>
-                <mat-icon>person_add</mat-icon>
-                Share this item
-              </ng-container>
-            }
-          </button>
-        </div>
-
-        @if (errorMessage(); as message) {
-          <p class="error-text">{{ message }}</p>
+  @if (loading()) {
+    <mat-progress-spinner diameter="32" mode="indeterminate" />
+  } @else if (!editing()) {
+    <div class="item-header">
+      <div>
+        <div class="k">{{ form.controls.itemType.value }}</div>
+        <h1>{{ form.controls.label.value || 'Vault item' }}</h1>
+        @if (createdUpdatedLabel(); as label) {
+          <div class="k item-dates">{{ label }}</div>
         }
-        @if (successMessage(); as message) {
-          <p class="success-text">{{ message }}</p>
+      </div>
+      <div class="item-header-actions">
+        <button mat-stroked-button type="button" (click)="viewHistory()">
+          <mat-icon>history</mat-icon>
+          History
+        </button>
+        <button mat-flat-button color="primary" type="button" (click)="startEditing()">Edit</button>
+      </div>
+    </div>
+
+    <section class="item-section">
+      <div class="k section-label">Fields</div>
+      <dl class="field-list">
+        @for (field of fields.controls; track $index) {
+          <div class="field-row-view">
+            <dt>{{ field.value.name }}</dt>
+            <dd>
+              <span class="mono">{{ isRevealed($index) ? field.value.value : '••••••••' }}</span>
+              <button mat-icon-button type="button" (click)="toggleReveal($index)" aria-label="Toggle visibility">
+                <mat-icon>{{ isRevealed($index) ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="copyValue(field.value.value ?? '')" aria-label="Copy value">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </dd>
+          </div>
         }
+      </dl>
+    </section>
 
-        <mat-card-actions class="actions">
-          <a mat-button routerLink="/vault">Back</a>
-          <button mat-button type="button" color="warn" (click)="deleteItem()">Delete</button>
-          <div class="edit-buttons">
-            <button mat-flat-button color="primary" type="button" (click)="startEditing()">
-              Edit
-            </button>
-          </div>
-        </mat-card-actions>
-      } @else {
-        <form [formGroup]="form" (ngSubmit)="save()">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Label</mat-label>
-            <input matInput formControlName="label" />
-          </mat-form-field>
+    <section class="item-section">
+      <div class="k section-label">Attachments</div>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Type</mat-label>
-            <mat-select formControlName="itemType">
-              @for (type of itemTypes; track type) {
-                <mat-option [value]="type">{{ type }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <div formArrayName="fields" class="fields">
-            @for (field of fields.controls; track $index) {
-              <div [formGroupName]="$index" class="field-row">
-                <mat-form-field appearance="outline">
-                  <mat-label>Field name</mat-label>
-                  <input matInput formControlName="name" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Value</mat-label>
-                  <input matInput formControlName="value" />
-                </mat-form-field>
-                <button
-                  mat-icon-button
-                  type="button"
-                  (click)="removeField($index)"
-                  aria-label="Remove field"
-                >
-                  <mat-icon>remove_circle_outline</mat-icon>
-                </button>
-              </div>
-            }
-          </div>
-
-          <button mat-stroked-button type="button" (click)="addField()">
-            <mat-icon>add</mat-icon>
-            Add field
-          </button>
-
-          @if (errorMessage(); as message) {
-            <p class="error-text">{{ message }}</p>
+      @if (attachments().length > 0) {
+        <ul class="attachment-list">
+          @for (attachment of attachments(); track attachment.id) {
+            <li>
+              <mat-icon>description</mat-icon>
+              <span>{{ attachment.fileName }}</span>
+              <button
+                mat-icon-button
+                type="button"
+                (click)="downloadAttachment(attachment)"
+                [disabled]="downloadingId() === attachment.id"
+                aria-label="Download file"
+              >
+                <mat-icon>download</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="deleteAttachment(attachment)" aria-label="Delete file">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </li>
           }
-
-          <mat-card-actions class="actions">
-            <button mat-button type="button" (click)="cancelEditing()">Cancel</button>
-            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
-              @if (saving()) {
-                <mat-progress-spinner diameter="20" mode="indeterminate" />
-              } @else {
-                Save
-              }
-            </button>
-          </mat-card-actions>
-        </form>
+        </ul>
       }
-    </mat-card-content>
-  </mat-card>
+
+      <input
+        #fileInput
+        type="file"
+        multiple
+        accept=".pdf,.docx"
+        hidden
+        (change)="addFiles(fileInput.files); fileInput.value = ''"
+      />
+      <button mat-stroked-button type="button" (click)="fileInput.click()">
+        <mat-icon>attach_file</mat-icon>
+        Attach PDF or DOCX
+      </button>
+
+      @if (uploadingLabel(); as label) {
+        <p class="uploading-text">
+          <mat-progress-spinner diameter="16" mode="indeterminate" />
+          Uploading {{ label }}…
+        </p>
+      }
+
+      <p class="k item-note">File contents are encrypted. The file name, type and size stay in the clear.</p>
+    </section>
+
+    <section class="item-section">
+      <div class="k section-label">Shared with</div>
+
+      @if (itemShares().length === 0) {
+        <p class="hint-text">
+          Not shared with anyone. If something happens to you, no one else can open this record.
+        </p>
+      } @else {
+        <mat-list>
+          @for (share of itemShares(); track share.id) {
+            <mat-list-item>
+              <span matListItemTitle>{{ share.holderName }}</span>
+              <span matListItemLine>{{ share.holderEmail }} &middot; {{ share.canEdit ? 'Can edit' : 'View only' }}</span>
+              <button mat-icon-button matListItemMeta (click)="revokeItemShare(share.id)" aria-label="Revoke access">
+                <mat-icon>person_remove</mat-icon>
+              </button>
+            </mat-list-item>
+          }
+        </mat-list>
+      }
+
+      <div class="item-actions">
+        <button mat-stroked-button type="button" [disabled]="sharingItem()" (click)="shareItem()">
+          @if (sharingItem()) {
+            <mat-progress-spinner diameter="20" mode="indeterminate" />
+          } @else {
+            <ng-container>
+              <mat-icon>person_add</mat-icon>
+              Share this item
+            </ng-container>
+          }
+        </button>
+        <a mat-stroked-button routerLink="/vault">Back</a>
+        <button mat-stroked-button type="button" class="danger" (click)="deleteItem()">Delete</button>
+      </div>
+    </section>
+
+    @if (errorMessage(); as message) {
+      <p class="error-text">{{ message }}</p>
+    }
+    @if (successMessage(); as message) {
+      <p class="success-text">{{ message }}</p>
+    }
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="save()" class="edit-form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Label</mat-label>
+        <input matInput formControlName="label" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Type</mat-label>
+        <mat-select formControlName="itemType">
+          @for (type of itemTypes; track type) {
+            <mat-option [value]="type">{{ type }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <div formArrayName="fields" class="fields">
+        @for (field of fields.controls; track $index) {
+          <div [formGroupName]="$index" class="field-row">
+            <mat-form-field appearance="outline">
+              <mat-label>Field name</mat-label>
+              <input matInput formControlName="name" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Value</mat-label>
+              <input matInput formControlName="value" />
+            </mat-form-field>
+            <button mat-icon-button type="button" (click)="removeField($index)" aria-label="Remove field">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+
+      <button mat-stroked-button type="button" (click)="addField()">
+        <mat-icon>add</mat-icon>
+        Add field
+      </button>
+
+      @if (errorMessage(); as message) {
+        <p class="error-text">{{ message }}</p>
+      }
+
+      <div class="item-actions">
+        <button mat-button type="button" (click)="cancelEditing()">Cancel</button>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          @if (saving()) {
+            <mat-progress-spinner diameter="20" mode="indeterminate" />
+          } @else {
+            Save
+          }
+        </button>
+      </div>
+    </form>
+  }
 </div>

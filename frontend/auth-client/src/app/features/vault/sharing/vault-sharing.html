@@ -1,76 +1,64 @@
 <div class="vault-page">
   <div class="vault-header">
     <h1>Emergency access</h1>
-    <a mat-button routerLink="/vault">Back to vault</a>
+    <a mat-stroked-button routerLink="/vault">Back to vault</a>
   </div>
 
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title>Grant access</mat-card-title>
-      <mat-card-subtitle>
-        The person must already be registered and have set up their own vault.
-      </mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      <form [formGroup]="form" (ngSubmit)="grantAccess()">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Email</mat-label>
-          <input matInput type="email" formControlName="email" />
-          @if (form.controls.email.hasError('required')) {
-            <mat-error>Email is required.</mat-error>
-          } @else if (form.controls.email.hasError('email')) {
-            <mat-error>Enter a valid email.</mat-error>
-          }
-        </mat-form-field>
+  <section class="share-section">
+    <h2>Grant access</h2>
+    <p class="section-intro">The person must already be registered and have set up their own vault.</p>
 
-        @if (errorMessage(); as message) {
-          <p class="error-text">{{ message }}</p>
+    <form [formGroup]="form" (ngSubmit)="grantAccess()">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email" />
+        @if (form.controls.email.hasError('required')) {
+          <mat-error>Email is required.</mat-error>
+        } @else if (form.controls.email.hasError('email')) {
+          <mat-error>Enter a valid email.</mat-error>
         }
-        @if (successMessage(); as message) {
-          <p class="success-text">{{ message }}</p>
-        }
+      </mat-form-field>
 
-        <div class="actions">
-          <span></span>
-          <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
-            @if (loading()) {
-              <mat-progress-spinner diameter="20" mode="indeterminate" />
-            } @else {
-              Grant access
-            }
-          </button>
-        </div>
-      </form>
-    </mat-card-content>
-  </mat-card>
-
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title>People with emergency access</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      @if (loadingShares()) {
-        <mat-progress-spinner diameter="32" mode="indeterminate" />
-      } @else if (shares().length === 0) {
-        <p>No one has emergency access to your vault yet.</p>
-      } @else {
-        <mat-list>
-          @for (share of shares(); track share.id) {
-            <mat-list-item>
-              <span matListItemTitle>{{ share.holderName }}</span>
-              <span matListItemLine
-                >{{ share.holderEmail }} &middot;
-                <span class="share-status" [class]="'status-' + share.status.toLowerCase()">{{
-                  statusLabel(share.status)
-                }}</span></span
-              >
-              <button mat-icon-button matListItemMeta (click)="revoke(share.id)" aria-label="Revoke access">
-                <mat-icon>close</mat-icon>
-              </button>
-            </mat-list-item>
-          }
-        </mat-list>
+      @if (errorMessage(); as message) {
+        <p class="error-text">{{ message }}</p>
       }
-    </mat-card-content>
-  </mat-card>
+      @if (successMessage(); as message) {
+        <p class="success-text">{{ message }}</p>
+      }
+
+      <div class="actions">
+        <span></span>
+        <button mat-flat-button color="primary" type="submit" [disabled]="loading()">
+          @if (loading()) {
+            <mat-progress-spinner diameter="20" mode="indeterminate" />
+          } @else {
+            Grant access
+          }
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="share-section">
+    <h2>People with emergency access</h2>
+
+    @if (loadingShares()) {
+      <mat-progress-spinner diameter="32" mode="indeterminate" />
+    } @else if (shares().length === 0) {
+      <p class="hint-text">No one has emergency access to your vault yet.</p>
+    } @else {
+      <ul class="holder-list">
+        @for (share of shares(); track share.id) {
+          <li>
+            <span class="holder-name">{{ share.holderName }}</span>
+            <span class="mono holder-email">{{ share.holderEmail }}</span>
+            <span class="tag" [class]="statusTagClass(share.status)">{{ statusLabel(share.status) }}</span>
+            <button mat-icon-button (click)="revoke(share.id)" aria-label="Revoke access">
+              <mat-icon>close</mat-icon>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
 </div>

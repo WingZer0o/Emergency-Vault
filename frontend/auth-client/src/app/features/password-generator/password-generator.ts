@@ -1,6 +1,5 @@
 import { Component, computed, effect, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule, MatCheckboxChange } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSliderModule } from '@angular/material/slider';
@@ -18,7 +17,7 @@ const COPIED_FEEDBACK_MS = 2000;
 
 @Component({
   selector: 'app-password-generator',
-  imports: [MatCardModule, MatButtonModule, MatIconModule, MatSliderModule, MatCheckboxModule, MatTooltipModule],
+  imports: [MatButtonModule, MatIconModule, MatSliderModule, MatCheckboxModule, MatTooltipModule],
   templateUrl: './password-generator.html',
   styleUrl: './password-generator.scss',
 })

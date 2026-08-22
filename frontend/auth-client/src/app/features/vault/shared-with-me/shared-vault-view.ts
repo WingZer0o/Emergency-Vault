@@ -5,21 +5,20 @@ import { firstValueFrom } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTableModule } from '@angular/material/table';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
 import { DecryptedVaultItem, VaultItemPayload } from '../../../core/models/vault.models';
 import { PaginationService } from '../../../core/services/pagination.service';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { relativeTime } from '../../../core/utils/relative-time.util';
 import { Paginator } from '../../../shared/paginator/paginator';
 import { SearchQueryBar } from '../../../components/search-query-bar/search-query-bar';
 import { extractErrorMessage } from '../../auth/auth-error.util';
-import { PageEvent } from '@angular/material/paginator';
 
 /**
  * Lists the items in a shared vault so a holder can pick one to open. Listing itself is never
@@ -33,11 +32,10 @@ import { PageEvent } from '@angular/material/paginator';
     ReactiveFormsModule,
     MatCardModule,
     MatButtonModule,
-    MatDividerModule,
     MatFormFieldModule,
     MatInputModule,
-    MatListModule,
     MatProgressSpinnerModule,
+    MatTableModule,
     Paginator,
     SearchQueryBar,
   ],
@@ -151,12 +149,14 @@ export class SharedVaultView implements OnInit {
     });
   }
 
+  readonly displayedColumns = ['record', 'type'];
+
   openItem(itemId: string): void {
     this.router.navigateByUrl(`/vault/shared-with-me/${this.ownerUserId}/items/${itemId}`);
   }
 
-  onPage(event: PageEvent): void {
-    this.pageIndex.set(event.pageIndex);
+  updatedLabel(item: DecryptedVaultItem): string {
+    return `Updated ${relativeTime(item.updatedAt)}`;
   }
 
   private async loadVaultContents(): Promise<void> {

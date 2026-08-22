@@ -44,16 +44,41 @@ body {
   // based on the user's saved preference, so Material's light-dark()-based tokens above
   // resolve to the right palette without a page reload.
 
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
+  // Use the actual Modernist tokens rather than Material's own --mat-sys-* surface tokens, so
+  // every screen's page background is pixel-consistent with the landing page and the redesigned
+  // authenticated screens.
+  background-color: var(--color-bg);
+  color: var(--color-text);
   font: var(--mat-sys-body-medium);
 
   // Reset the user agent margin.
   margin: 0;
   height: 100%;
+}
+
+// Plain links (menu items and mat-*-button anchors have their own, more specific Material
+// styling and win over this) weren't covered by any of the Modernist component classes ported
+// from the landing page - they fell back to the browser's default blue. Every "Forgot password?"/
+// "Register"/"Resend code" style link across the auth and vault-form screens picks this up.
+a {
+  color: var(--color-accent);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--color-accent-hover);
+}
+
+// Flatten the three "floating" Material overlay surfaces the same way mat-card is flattened
+// elsewhere - no shadow, a 1px rule standing in for the elevation boundary instead. mat-select's
+// panel shadow in particular is hard-coded rgba(0,0,0,...) in Material's own stylesheet (not
+// theme-token-driven), so it has to be overridden directly rather than through a CSS variable.
+.mat-mdc-menu-panel,
+.mat-mdc-select-panel,
+.mat-mdc-dialog-surface {
+  box-shadow: none !important;
+  border: 1px solid var(--color-divider);
+  background-color: var(--color-bg);
 }
 
 .auth-page {
@@ -64,9 +89,37 @@ body {
   padding: 16px;
 }
 
+// Shared by every single-form screen: the six auth screens plus vault setup/unlock/recover.
+// Modernist drops the floating card in favor of a plain block on the page background, with a
+// rule under the header instead of a shadow boundary - restyled once here rather than in each of
+// those nine templates.
 .auth-card {
   width: 100%;
   max-width: 420px;
+  background: transparent;
+  box-shadow: none;
+
+  .mat-mdc-card-header {
+    padding: 0 0 20px;
+    border-bottom: 2px solid var(--color-divider);
+    margin-bottom: 20px;
+  }
+
+  mat-card-title {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 30px;
+    letter-spacing: -0.02em;
+  }
+
+  mat-card-subtitle {
+    margin-top: 8px;
+    font-size: 13px;
+  }
+
+  .mat-mdc-card-content {
+    padding: 0;
+  }
 }
 
 .auth-card form {
@@ -89,13 +142,13 @@ body {
 }
 
 .error-text {
-  color: var(--mat-sys-error);
+  color: var(--color-accent-muted);
   font-size: 14px;
   margin: 4px 0 0;
 }
 
 .success-text {
-  color: var(--mat-sys-primary);
+  color: var(--color-accent);
   font-size: 14px;
   margin: 4px 0 0;
 }

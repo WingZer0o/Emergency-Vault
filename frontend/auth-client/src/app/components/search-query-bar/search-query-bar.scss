@@ -1,19 +1,36 @@
-// mat-card-header projects the title into its own .mat-mdc-card-header-text div, which is a flex
-// item with no flex-grow - so it collapses to the search field's intrinsic width no matter how
-// wide the card is. ::ng-deep is needed because that div belongs to MatCardHeader's template
-// rather than this one; the mat-card-header prefix keeps the override scoped to this component.
-mat-card-header ::ng-deep .mat-mdc-card-header-text {
+// Modernist calls for a borderless search input on a bottom rule instead of the usual
+// mat-form-field outline box, so this bypasses Angular Material's input styling entirely rather
+// than restyling it - the one control in the app deliberately built as a plain input.
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border-bottom: 2px solid var(--color-divider);
+  padding-bottom: 10px;
+
+  .k {
+    color: var(--color-neutral-muted);
+    flex-shrink: 0;
+  }
+}
+
+.search-bar-input {
+  flex: 1;
   min-width: 0;
-}
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-text);
+  caret-color: var(--color-accent);
+  padding: 2px 0;
 
-mat-card-header form {
-  min-width: 150px;
-  max-width: 500px;
-  width: 100%;
-}
+  &::placeholder {
+    color: var(--color-neutral-muted);
+  }
 
-// mat-form-field is display: inline-flex, so it shrinks to its content until given a width. Once
-// it has one, the infix inside it (flex: auto, width: 180px) grows to fill the rest.
-mat-card-header mat-form-field {
-  width: 100%;
+  &:focus {
+    outline: none;
+  }
 }

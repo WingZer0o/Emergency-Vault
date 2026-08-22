@@ -1,12 +1,10 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { importPublicKeySpki } from '../../../core/crypto/webcrypto.util';
@@ -21,12 +19,10 @@ import { extractErrorMessage } from '../../auth/auth-error.util';
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    MatCardModule,
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
     MatIconModule,
-    MatListModule,
     MatProgressSpinnerModule,
   ],
   templateUrl: './vault-sharing.html',
@@ -102,6 +98,17 @@ export class VaultSharing implements OnInit {
       next: () => this.shares.update((shares) => shares.filter((share) => share.id !== shareId)),
       error: (err) => this.errorMessage.set(extractErrorMessage(err, 'Could not revoke access.')),
     });
+  }
+
+  statusTagClass(status: VaultShareStatus): string {
+    switch (status) {
+      case 'Active':
+        return 'tag-accent';
+      case 'Failed':
+        return 'tag-outline';
+      default:
+        return 'tag-neutral';
+    }
   }
 
   statusLabel(status: VaultShareStatus): string {

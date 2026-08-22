@@ -1,9 +1,4 @@
 <div class="vault-page">
-  <div class="vault-header">
-    <h1>{{ ownerName() || 'Shared vault' }}</h1>
-    <a mat-button routerLink="/vault/shared-with-me">Back</a>
-  </div>
-
   @if (loading()) {
     <mat-progress-spinner diameter="32" mode="indeterminate" />
   } @else if (challengeToken()) {
@@ -54,24 +49,48 @@
       </mat-card-content>
     </mat-card>
   } @else if (errorMessage(); as message) {
+    <div class="vault-header">
+      <h1>Shared vault</h1>
+      <a mat-stroked-button routerLink="/vault/shared-with-me">Back</a>
+    </div>
     <p class="error-text">{{ message }}</p>
   } @else if (items().length === 0) {
+    <div class="vault-header">
+      <h1>{{ ownerName() || 'Shared vault' }}</h1>
+      <a mat-stroked-button routerLink="/vault/shared-with-me">Back</a>
+    </div>
     <p>This vault has no items yet.</p>
   } @else {
-    <mat-card>
+    <div class="vault-header">
+      <div>
+        <h1>{{ ownerName() || 'Shared vault' }}</h1>
+        <div class="k vault-subline">{{ items().length }} record{{ items().length === 1 ? '' : 's' }}</div>
+      </div>
+      <a mat-stroked-button routerLink="/vault/shared-with-me">Back</a>
+    </div>
+
+    <div class="vault-body">
       <app-search-query-bar [(searchQuery)]="searchQuery"></app-search-query-bar>
-      <mat-list>
-        @for (item of pagedItems(); track item.id; let last = $last) {
-          <mat-list-item (click)="openItem(item.id)" class="vault-item">
-            <span matListItemTitle>{{ item.label }}</span>
-            <span matListItemLine>{{ item.itemType }}</span>
-          </mat-list-item>
-          @if (!last) {
-            <mat-divider></mat-divider>
-          }
-        }
-      </mat-list>
+
+      <table mat-table [dataSource]="pagedItems()" class="records-table">
+        <ng-container matColumnDef="record">
+          <th mat-header-cell *matHeaderCellDef>Record</th>
+          <td mat-cell *matCellDef="let item">
+            <div class="record-label">{{ item.label }}</div>
+            <div class="k record-updated">{{ updatedLabel(item) }}</div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let item">{{ item.itemType }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let item; columns: displayedColumns" class="record-row" (click)="openItem(item.id)"></tr>
+      </table>
+
       <app-paginator [length]="filteredItems().length" [(pageIndex)]="pageIndex" />
-    </mat-card>
+    </div>
   }
 </div>

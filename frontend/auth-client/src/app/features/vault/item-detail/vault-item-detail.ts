@@ -3,7 +3,6 @@ import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse, HttpEventType, HttpResponse } from '@angular/common/http';
 import { filter, firstValueFrom } from 'rxjs';
-import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -26,6 +25,7 @@ import { wrapAesKeyForRecipient } from '../../../core/crypto/hybrid-kem.util';
 import { VaultItemAttachmentDto, VaultItemPayload, VaultShareDto } from '../../../core/models/vault.models';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { relativeTime } from '../../../core/utils/relative-time.util';
 import { ItemRevisionsDialog } from '../../../shared/item-revisions-dialog/item-revisions-dialog';
 import { ShareItemDialog, ShareItemDialogResult } from '../../../shared/share-item-dialog/share-item-dialog';
 import { extractErrorMessage } from '../../auth/auth-error.util';
@@ -37,7 +37,6 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    MatCardModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -79,6 +78,8 @@ export class VaultItemDetail implements OnInit {
   readonly itemShares = signal<VaultShareDto[]>([]);
   readonly sharingItem = signal(false);
   readonly successMessage = signal<string | null>(null);
+  readonly createdAt = signal<string | null>(null);
+  readonly updatedAt = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     label: ['', [Validators.required]],
@@ -88,6 +89,13 @@ export class VaultItemDetail implements OnInit {
 
   get fields(): FormArray {
     return this.form.controls.fields;
+  }
+
+  createdUpdatedLabel(): string {
+    const created = this.createdAt();
+    const updated = this.updatedAt();
+    if (!created || !updated) return '';
+    return created === updated ? `Created ${relativeTime(created)}` : `Updated ${relativeTime(updated)}`;
   }
 
   ngOnInit(): void {
@@ -102,6 +110,8 @@ export class VaultItemDetail implements OnInit {
           this.form.patchValue({ label: payload.label, itemType: payload.itemType });
           this.fields.clear();
           payload.fields.forEach((field) => this.fields.push(this.createFieldGroup(field.name, field.value)));
+          this.createdAt.set(dto.createdAt);
+          this.updatedAt.set(dto.updatedAt);
           this.loading.set(false);
         } catch {
           this.loading.set(false);
