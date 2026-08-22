@@ -44,9 +44,8 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
     MatButtonModule,
     MatIconModule,
     MatListModule,
-    MatProgressSpinnerModule,
-    ConfirmDialog
-  ],
+    MatProgressSpinnerModule
+],
   templateUrl: './vault-item-detail.html',
   styleUrl: './vault-item-detail.scss',
 })
