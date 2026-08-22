@@ -673,10 +673,7 @@ public class VaultService(
             return ServiceResult.Failure("This code has expired. Request a new one.");
         }
 
-        var expectedCode = hotpService.GenerateCode(
-            Convert.FromBase64String(share.VerificationSecret!), share.VerificationCounter, _vaultShareCodesOptions.CodeLength);
-
-        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(code), Encoding.UTF8.GetBytes(expectedCode)))
+        if (!hotpService.VerifyCode(share.VerificationSecret, code, share.VerificationCounter))
         {
             share.VerificationAttempts += 1;
             await vaultRepository.SaveChangesAsync(ct);
@@ -809,10 +806,7 @@ public class VaultService(
             return ServiceResult.Failure("Invalid or expired code. Request a new one.");
         }
 
-        var expectedCode = hotpService.GenerateCode(
-            Convert.FromBase64String(share.VerificationSecret), challenge.Counter, _vaultShareCodesOptions.CodeLength);
-
-        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(code), Encoding.UTF8.GetBytes(expectedCode)))
+        if (!hotpService.VerifyCode(share.VerificationSecret, code, share.VerificationCounter))
         {
             var attempts = challenge.Attempts + 1;
             if (attempts >= _vaultShareCodesOptions.MaxAttempts)
