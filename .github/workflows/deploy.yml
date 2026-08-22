@@ -2,8 +2,9 @@ name: Deploy
 
 # Backend and frontend deploy on every push to main, backend first (deploy_frontend has a hard
 # `needs: deploy_backend` dependency below so the API is always live before the SPA that calls it).
-# Tests run on the PR (see test.yml) and are a required check before merge - this workflow trusts
-# that gate and does not re-run tests.
+# Tests also run on the PR (see pr-tests.yml) as a required check before merge, but this workflow
+# re-runs them itself as a final gate right before deploying (e.g. an admin merge that bypassed
+# the required check should not skip straight to production).
 # Each job's real work is skipped via paths-filter when its own tree didn't change, but the job
 # itself still runs so the ordering dependency always resolves.
 on:
@@ -33,9 +34,39 @@ jobs:
             frontend:
               - "frontend/auth-client/**"
 
-  deploy_backend:
+  backend_tests:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    name: Backend Tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Test
+        working-directory: backend
+        run: dotnet test EmergencyVault.slnx
+
+  frontend_tests:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    name: Frontend Tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install and test
+        working-directory: frontend/auth-client
+        run: |
+          npm ci
+          npm test
+
+  deploy_backend:
+    needs: [changes, backend_tests]
+    if: needs.changes.outputs.backend == 'true' && needs.backend_tests.result == 'success'
     runs-on: ubuntu-latest
     name: Deploy Backend (Container App)
     steps:
@@ -67,10 +98,11 @@ jobs:
             --image ${{ vars.AZURE_CONTAINER_REGISTRY }}.azurecr.io/backend:${{ github.sha }}
 
   deploy_frontend:
-    needs: [changes, deploy_backend]
+    needs: [changes, frontend_tests, deploy_backend]
     if: |
       always() &&
       needs.changes.outputs.frontend == 'true' &&
+      needs.frontend_tests.result == 'success' &&
       (needs.deploy_backend.result == 'success' || needs.deploy_backend.result == 'skipped')
     runs-on: ubuntu-latest
     name: Deploy Frontend (Static Web App)
