@@ -45,6 +45,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
     MatIconModule,
     MatListModule,
     MatProgressSpinnerModule,
+    ConfirmDialog
   ],
   templateUrl: './vault-item-detail.html',
   styleUrl: './vault-item-detail.scss',
@@ -404,9 +405,21 @@ export class VaultItemDetail implements OnInit {
   }
 
   deleteAttachment(attachment: VaultItemAttachmentDto): void {
-    this.vaultService.deleteAttachment(this.itemId, attachment.id).subscribe({
-      next: () => this.attachments.update((current) => current.filter((a) => a.id !== attachment.id)),
-      error: (err) => this.errorMessage.set(extractErrorMessage(err, `Could not delete ${attachment.fileName}.`)),
+    this.dialog.open(ConfirmDialog, {
+      data: {
+        title: `Delete ${attachment.fileName}?`,
+        message: `Are you sure you want to delete ${attachment.fileName}? This action cannot be undone.`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        danger: true,
+      }
+    }).afterClosed().subscribe((result: boolean) => {
+      if (result) {
+        this.vaultService.deleteAttachment(this.itemId, attachment.id).subscribe({
+          next: () => this.attachments.update((current) => current.filter((a) => a.id !== attachment.id)),
+          error: (err) => this.errorMessage.set(extractErrorMessage(err, `Could not delete ${attachment.fileName}.`)),
+        });
+      }
     });
   }
 
