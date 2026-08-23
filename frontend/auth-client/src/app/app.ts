@@ -49,6 +49,16 @@ export class App {
     system: 'brightness_auto',
   };
 
+  constructor() {
+    this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd))
+      .subscribe((event: NavigationEnd) => {
+        (<any>window).gtag('event', 'page_view', {
+          page_path: event.urlAfterRedirects,
+        });
+      });
+  }
+
   setThemeMode(mode: ThemeMode): void {
     this.themeService.setMode(mode);
   }
