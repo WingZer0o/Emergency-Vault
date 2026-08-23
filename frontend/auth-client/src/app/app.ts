@@ -12,6 +12,13 @@ import { AuthService } from './core/services/auth.service';
 import { ThemeMode, ThemeService } from './core/services/theme.service';
 import { VaultSessionService } from './core/services/vault-session.service';
 
+declare global {
+  interface Window {
+    dataLayer: unknown[];
+    gtag: (...args: unknown[]) => void;
+  }
+}
+
 @Component({
   selector: 'app-root',
   imports: [
@@ -53,7 +60,7 @@ export class App {
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
       .subscribe((event: NavigationEnd) => {
-        (<any>window).gtag('event', 'page_view', {
+        window.gtag?.('event', 'page_view', {
           page_path: event.urlAfterRedirects,
         });
       });
