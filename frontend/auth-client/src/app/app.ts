@@ -62,6 +62,7 @@ export class App {
       .subscribe((event: NavigationEnd) => {
         window.gtag?.('event', 'page_view', {
           page_path: event.urlAfterRedirects,
+          page_title: document.title,
         });
       });
   }
