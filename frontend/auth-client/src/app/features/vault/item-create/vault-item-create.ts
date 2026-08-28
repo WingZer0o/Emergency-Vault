@@ -15,6 +15,7 @@ import { VaultItemAttachmentDto, VaultItemPayload } from '../../../core/models/v
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { extractErrorMessage } from '../../auth/auth-error.util';
+import { checkPwnedCount } from '../../../core/utils/pwned-password.util';
 
 export const VAULT_ITEM_TYPES = ['Financial Institution Login', 'Insurance', 'Medical', 'Legal Documents', 'Documents', 'Other'];
 
@@ -96,8 +97,10 @@ export class VaultItemCreate {
     this.stagedFiles.update((current) => current.filter((_, i) => i !== index));
   }
 
-  submit(): void {
-    if (this.form.invalid) {
+  async submit(): Promise<void> {
+    const password = this.form.controls.fields.controls.find(control => control.controls.name.value === 'Password' || control.controls.name.value.toLowerCase().includes('pass'))?.controls.value.value || '';
+    if (this.form.invalid || (await checkPwnedCount(password)) > 0) {
+      this.errorMessage.set('The password you entered has been found in a known data breach. Please choose a different password.');
       this.form.markAllAsTouched();
       return;
     }
