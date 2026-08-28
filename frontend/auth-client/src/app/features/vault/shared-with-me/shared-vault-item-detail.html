@@ -51,7 +51,7 @@
   } @else if (errorMessage(); as message) {
     <div class="item-header">
       <h1>{{ ownerName() || 'Shared item' }}</h1>
-      <a mat-stroked-button [routerLink]="['/vault/shared-with-me', ownerUserId]">Back</a>
+      <a mat-stroked-button [routerLink]="'/vault/shared-with-me'">Back</a>
     </div>
     <p class="error-text">{{ message }}</p>
   } @else if (item(); as currentItem) {
@@ -65,7 +65,7 @@
           }
         </div>
         <div class="item-header-actions">
-          <a mat-stroked-button [routerLink]="['/vault/shared-with-me', ownerUserId]">Back</a>
+          <a mat-stroked-button [routerLink]="'/vault/shared-with-me'">Back</a>
           @if (canEdit()) {
             <button mat-flat-button color="primary" type="button" (click)="startEditing()">Edit</button>
           }
