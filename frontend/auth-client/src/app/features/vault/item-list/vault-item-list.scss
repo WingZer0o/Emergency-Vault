@@ -73,6 +73,15 @@
   font-family: var(--font-heading);
   font-weight: 800;
   font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.breach-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .record-updated {

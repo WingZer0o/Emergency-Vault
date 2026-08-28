@@ -8,6 +8,7 @@ import { MatTableModule } from '@angular/material/table';
 
 import { decryptItemPayload } from '../../../core/crypto/webcrypto.util';
 import { DecryptedVaultItem, VaultItemPayload } from '../../../core/models/vault.models';
+import { checkPwnedCount } from '../../../core/utils/pwned-password.util';
 import { PaginationService } from '../../../core/services/pagination.service';
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
@@ -57,8 +58,43 @@ export class VaultItemList implements OnInit {
 
   readonly displayedColumns = ['record', 'type', 'actions'];
 
+  readonly checkingHealth = signal(false);
+  readonly breachedItemIds = signal<ReadonlySet<string>>(new Set());
+
   ngOnInit(): void {
     this.loadItems();
+  }
+
+  /** Sequential, not Promise.all - a vault has few enough password fields that batching isn't
+   * worth hammering HIBP with concurrent requests. Each password's hash prefix is looked up
+   * independently (see checkPwnedCount) so this never sends a password or full hash anywhere. */
+  async checkVaultHealth(): Promise<void> {
+    this.checkingHealth.set(true);
+    this.errorMessage.set(null);
+
+    try {
+      const breached = new Set<string>();
+      const promises: Promise<void>[] = [];
+      for (const item of this.items()) {
+        const hibpPromise = new Promise<void>(async (resolve) => {
+          const passwordFields = item.fields.filter((field) => field.name && field.value);
+          for (const field of passwordFields) {
+            if (await checkPwnedCount(field.value) > 0) {
+              breached.add(item.id);
+              break;
+            }
+          }
+          resolve();
+        });
+        promises.push(hibpPromise);
+      }
+      await Promise.all(promises);
+      this.breachedItemIds.set(breached);
+    } catch {
+      this.errorMessage.set('Could not complete the breach check - try again in a moment.');
+    } finally {
+      this.checkingHealth.set(false);
+    }
   }
 
   updatedLabel(item: DecryptedVaultItem): string {
