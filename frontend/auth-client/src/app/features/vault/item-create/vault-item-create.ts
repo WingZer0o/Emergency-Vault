@@ -60,6 +60,8 @@ export class VaultItemCreate {
     // document with nothing worth storing as structured key/value data. The array above starts
     // with one group only so TypeScript can infer its element type; clear it back out here.
     this.fields.clear();
+    this.fields.push(this.createFieldGroup('Username'));
+    this.fields.push(this.createFieldGroup('Password'));
   }
 
   get fields(): FormArray {
