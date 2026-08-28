@@ -77,7 +77,7 @@ export class VaultItemList implements OnInit {
       const promises: Promise<void>[] = [];
       for (const item of this.items()) {
         const hibpPromise = new Promise<void>(async (resolve) => {
-          const passwordFields = item.fields.filter((field) => field.name && field.value);
+          const passwordFields = item.fields.filter((field) => (field.name.toLowerCase() === 'password' || field.name.toLowerCase().includes('pass'))  && field.value);
           for (const field of passwordFields) {
             if (await checkPwnedCount(field.value) > 0) {
               breached.add(item.id);
@@ -147,6 +147,7 @@ export class VaultItemList implements OnInit {
           );
           this.items.set(decrypted);
           this.pageIndex.set(0);
+          this.checkVaultHealth();
         } catch {
           this.errorMessage.set('Could not decrypt your vault items.');
         } finally {
