@@ -45,7 +45,7 @@
             <div class="record-label">
               {{ item.label }}
               @if (breachedItemIds().has(item.id)) {
-                <mat-icon class="breach-icon" color="warn" aria-label="Contains a breached password" title="Contains a breached password">warning</mat-icon>
+                <mat-icon class="breach-icon" aria-label="Contains a breached password" title="Contains a breached password">warning</mat-icon>
               }
             </div>
             <div class="k record-updated">{{ updatedLabel(item) }}</div>
