@@ -26,7 +26,7 @@
   @if (breachedItemIds().size > 0) {
     <p class="error-text">
       {{ breachedItemIds().size }} item{{ breachedItemIds().size === 1 ? '' : 's' }} contain a password found in a
-      known data breach - flagged below.
+      known data breach - flagged below by the followig icon. <mat-icon class="breach-icon" aria-label="Contains a breached password" title="Contains a breached password">warning</mat-icon>
     </p>
   }
 
