@@ -16,23 +16,27 @@ async function sha1Hex(text: string): Promise<string> {
 
 /** Returns how many times a password has appeared in known breaches (0 = not found). */
 export async function checkPwnedCount(password: string): Promise<number> {
-  const hash = await sha1Hex(password);
-  const prefix = hash.slice(0, 5);
-  const suffix = hash.slice(5);
-
-  const response = await fetch(`${HIBP_RANGE_URL}${prefix}`, {
-    headers: { 'Add-Padding': 'true' },
-  });
-  if (!response.ok) {
-    throw new Error(`HIBP range lookup failed with status ${response.status}`);
-  }
-
-  const body = await response.text();
-  for (const line of body.split('\n')) {
-    const [lineSuffix, count] = line.trim().split(':');
-    if (lineSuffix === suffix) {
-      return Number(count);
+  if (password) {
+    const hash = await sha1Hex(password);
+    const prefix = hash.slice(0, 5);
+    const suffix = hash.slice(5);
+  
+    const response = await fetch(`${HIBP_RANGE_URL}${prefix}`, {
+      headers: { 'Add-Padding': 'true' },
+    });
+    if (!response.ok) {
+      throw new Error(`HIBP range lookup failed with status ${response.status}`);
     }
+  
+    const body = await response.text();
+    for (const line of body.split('\n')) {
+      const [lineSuffix, count] = line.trim().split(':');
+      if (lineSuffix === suffix) {
+        return Number(count);
+      }
+    }
+    return 0;
+  } else {
+    throw new Error('Password must not be empty.');
   }
-  return 0;
 }
