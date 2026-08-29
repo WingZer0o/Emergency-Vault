@@ -10,5 +10,12 @@ import { AuthService } from '../../core/services/auth.service';
   styleUrl: './landing.scss',
 })
 export class Landing {
-  protected readonly authService = inject(AuthService);
+  public readonly authService = inject(AuthService);
+
+  public scrollToSection(sectionId: string): void {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
 }

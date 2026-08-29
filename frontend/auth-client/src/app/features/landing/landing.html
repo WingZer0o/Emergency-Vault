@@ -1,10 +1,10 @@
 <div class="landing">
   <nav class="nav">
     <span class="nav-brand">Emergency Vault</span>
-    <a href="#how-it-works">How it works</a>
-    <a href="#cryptography">Cryptography</a>
-    <a href="#use-cases">For executors</a>
-    <a href="mailto:support@emergencyvault.net">Support</a>
+    <a (click)="scrollToSection('how-it-works')" class="nav-link">How it works</a>
+    <a (click)="scrollToSection('cryptography')" class="nav-link">Cryptography</a>
+    <a (click)="scrollToSection('use-cases')" class="nav-link">For executors</a>
+    <a href="mailto:support@emergencyvault.net" class="nav-link">Support</a>
     @if (authService.isAuthenticated()) {
       <a class="btn btn-primary" routerLink="/profile" style="margin-left: 8px">Go to profile</a>
     } @else {
@@ -26,7 +26,7 @@
         design, including by us.
       </p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="#how-it-works">See how it works</a>
+        <a class="btn btn-primary" (click)="scrollToSection('how-it-works')">See how it works</a>
         @if (authService.isAuthenticated()) {
           <a class="btn btn-secondary" routerLink="/vault/setup">Create a vault</a>
         } @else {
