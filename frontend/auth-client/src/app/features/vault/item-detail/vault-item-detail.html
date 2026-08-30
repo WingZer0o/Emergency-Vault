@@ -27,10 +27,20 @@
             <dt>{{ field.value.name }}</dt>
             <dd>
               <span class="mono">{{ isRevealed($index) ? field.value.value : '••••••••' }}</span>
-              <button mat-icon-button type="button" (click)="toggleReveal($index)" aria-label="Toggle visibility">
+              <button
+                mat-icon-button
+                type="button"
+                (click)="toggleReveal($index)"
+                aria-label="Toggle visibility"
+              >
                 <mat-icon>{{ isRevealed($index) ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="copyValue(field.value.value ?? '')" aria-label="Copy value">
+              <button
+                mat-icon-button
+                type="button"
+                (click)="copyValue(field.value.value ?? '')"
+                aria-label="Copy value"
+              >
                 <mat-icon>content_copy</mat-icon>
               </button>
             </dd>
@@ -57,7 +67,12 @@
               >
                 <mat-icon>download</mat-icon>
               </button>
-              <button mat-icon-button type="button" (click)="deleteAttachment(attachment)" aria-label="Delete file">
+              <button
+                mat-icon-button
+                type="button"
+                (click)="deleteAttachment(attachment)"
+                aria-label="Delete file"
+              >
                 <mat-icon>delete_outline</mat-icon>
               </button>
             </li>
@@ -85,7 +100,9 @@
         </p>
       }
 
-      <p class="k item-note">File contents are encrypted. The file name, type and size stay in the clear.</p>
+      <p class="k item-note">
+        File contents are encrypted. The file name, type and size stay in the clear.
+      </p>
     </section>
 
     <section class="item-section">
@@ -95,21 +112,6 @@
         <p class="hint-text">
           Not shared with anyone. If something happens to you, no one else can open this record.
         </p>
-      } @else {
-        <mat-list>
-          @for (share of itemShares(); track share.id) {
-            <mat-list-item>
-              <span matListItemTitle>{{ share.holderName }}</span>
-              <span matListItemLine>{{ share.holderEmail }} &middot; {{ share.canEdit ? 'Can edit' : 'View only' }}</span>
-              <button mat-icon-button matListItemMeta (click)="revokeItemShare(share.id)" aria-label="Revoke access">
-                <mat-icon>person_remove</mat-icon>
-              </button>
-            </mat-list-item>
-          }
-        </mat-list>
-      }
-
-      <div class="item-actions">
         <button mat-stroked-button type="button" [disabled]="sharingItem()" (click)="shareItem()">
           @if (sharingItem()) {
             <mat-progress-spinner diameter="20" mode="indeterminate" />
@@ -120,10 +122,32 @@
             </ng-container>
           }
         </button>
-        <a mat-stroked-button routerLink="/vault">Back</a>
-        <button mat-stroked-button type="button" class="danger" (click)="deleteItem()">Delete</button>
-      </div>
+      } @else {
+        <mat-list>
+          @for (share of itemShares(); track share.id) {
+            <mat-list-item>
+              <span matListItemTitle>{{ share.holderName }}</span>
+              <span matListItemLine
+                >{{ share.holderEmail }} &middot;
+                {{ share.canEdit ? 'Can edit' : 'View only' }}</span
+              >
+              <button
+                mat-icon-button
+                matListItemMeta
+                (click)="revokeItemShare(share.id)"
+                aria-label="Revoke access"
+              >
+                <mat-icon>person_remove</mat-icon>
+              </button>
+            </mat-list-item>
+          }
+        </mat-list>
+      }
     </section>
+    <div class="item-actions">
+      <button mat-stroked-button routerLink="/vault">Back</button>
+      <button mat-stroked-button type="button" class="danger" (click)="deleteItem()">Delete</button>
+    </div>
 
     @if (errorMessage(); as message) {
       <p class="error-text">{{ message }}</p>
@@ -158,7 +182,12 @@
               <mat-label>Value</mat-label>
               <input matInput formControlName="value" />
             </mat-form-field>
-            <button mat-icon-button type="button" (click)="removeField($index)" aria-label="Remove field">
+            <button
+              mat-icon-button
+              type="button"
+              (click)="removeField($index)"
+              aria-label="Remove field"
+            >
               <mat-icon>remove_circle_outline</mat-icon>
             </button>
           </div>
