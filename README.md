@@ -15,6 +15,7 @@ fast validation.
 | Database       | SQL Server (EF Core, code-first migrations)                            |
 | Cache          | Redis (refresh-token fast-path validation)                             |
 | Containers     | Docker Compose (SQL Server, Redis, API, frontend)                      |
+| Desktop        | `deno desktop` (WebView2/WKWebView/WebKitGTK), signed with Azure Artifact Signing, packaged with Inno Setup (Windows) |
 
 ## Project layout
 
@@ -28,6 +29,9 @@ backend/
     EmergencyVault.Api             - controllers, Program.cs, Dockerfile
 frontend/
   auth-client/                 - Angular app (core services/guards/interceptors, feature screens)
+    server.ts                  - Deno server; also the desktop app's runtime shell (see below)
+    deno.json                  - desktop build/installer tasks
+    installer/                 - Inno Setup script (EmergencyVault.iss) + icon
 docker-compose.yml             - base service definitions (sqlserver, redis, api, frontend)
 docker-compose.override.yml    - auto-merged dev overrides: hot reload for api + frontend
 docker-compose.prod.yml        - optimized build overlay (opt-in, see below)
@@ -121,6 +125,8 @@ Azure resources (resource group `Application`):
 | SQL Database | `EmergencyVaultDb` | |
 | Managed Redis | `ev-redis-5059.westus2.redis.azure.net:10000` | Access keys disabled - Entra ID auth only |
 | Static Web App | `emergency-vault` | Frontend (pre-existing) |
+| Artifact Signing account | `emergency-vault` | Code-signs the desktop app (see below) |
+| Storage account | `evdownloads` | Public `downloads` container mirroring the latest desktop installer(s) + `manifest.json`, for the landing page's download links (repo is private, so GitHub Release assets alone aren't publicly fetchable) |
 
 **Auth chain is fully federated - no long-lived secrets anywhere in the deploy or runtime path:**
 
@@ -137,6 +143,9 @@ Azure resources (resource group `Application`):
   host ends in `.redis.azure.net`). Access keys are disabled on the cache.
 - **GitHub Actions deploy identity -> ACR / Container App**: `AcrPush` on the registry,
   `Container Apps Contributor` scoped to just the `ev-backend` app.
+- **GitHub Actions deploy identity -> Artifact Signing / Storage**: `Artifact Signing Certificate
+  Profile Signer` scoped to the `emergency-vault` signing account, and `Storage Blob Data
+  Contributor` scoped to `evdownloads` - both used only by `build_desktop_installer` (see below).
 
 The only static secrets involved anywhere are the three Infisical bootstrap credentials
 (`INFISICAL_CLIENT_ID`/`_SECRET`/`_PROJECT_ID`), stored as Container App secrets - Infisical
@@ -161,6 +170,54 @@ To redeploy the backend manually (e.g. outside CI):
 az acr build --registry evbackendacr --image backend:manual --file backend/src/EmergencyVault.Api/Dockerfile --target final backend
 az containerapp update -n ev-backend -g Application --image evbackendacr.azurecr.io/backend:manual
 ```
+
+## Desktop app
+
+`frontend/auth-client` also compiles to a native desktop app via `deno desktop` (WebView2 on
+Windows, WKWebView on macOS, WebKitGTK on Linux) - `server.ts` hosts the built Angular app and
+proxies `/api/*`, same as in Docker/Azure, just running from a compiled binary instead of behind
+nginx/SWA. See `frontend/auth-client/deno.json` for the build/installer tasks and
+`frontend/CLAUDE.md` for the exact commands.
+
+`build_desktop_installer` in `deploy.yml` builds, signs and publishes a Windows installer on every
+push to `main` that touches `frontend/auth-client/**`, running in parallel with `deploy_frontend`
+(both gated on `deploy_backend`):
+
+1. **Version**: auto-incremented from the latest `desktop-v*` git tag (starts at `1.0.0`).
+2. **Build**: `ng build` -> `deno task desktop-build:prod` compiles `emergency-vault.exe`, baking
+   in the production backend URL (`write-api-target.ts`) since a compiled binary has no env vars
+   at launch.
+3. **Sign**: both `emergency-vault.exe` and the Inno Setup output are signed via
+   `azure/artifact-signing-action` against the `emergency-vault` Artifact Signing account /
+   `emergency-vault-public` certificate profile (Individual identity validation - the publisher
+   name on the signature is the validated individual's legal name, not a custom brand string;
+   Organization validation would be needed to sign as "Emergency Vault" itself). SHA-256 digest,
+   RFC3161 timestamped so the signature outlives the certificate's intentionally short (~3-day)
+   validity window.
+4. **Package**: `Minionguyjpro/Inno-Setup-Action` compiles `installer/EmergencyVault.iss` - a
+   per-user install (no UAC prompt) to `%LOCALAPPDATA%`.
+5. **Publish**: a GitHub Release (tag `desktop-v<version>`) gets the installer as an asset, *and*
+   the same file is uploaded to `evdownloads` blob storage as a fixed-name
+   `windows/EmergencyVault-Setup-latest.exe`, with `manifest.json` updated (merged, not
+   overwritten, so a future macOS/Linux job can add its own key without clobbering this one). The
+   blob mirror exists because the repo is private - GitHub Release assets require an
+   `Authorization` header even to fetch the "public" download URL, so the landing page's download
+   button points at the public blob container instead.
+
+The landing page's `app-download-links` component (`shared/download-links/`) fetches that
+manifest and renders one card per platform the manifest actually has an entry for - macOS/Linux
+will show "Coming soon" and light up automatically once a CI job publishes their manifest key, no
+frontend changes required beyond the display label in `KNOWN_PLATFORMS`.
+
+The compiled app also knows it's the desktop app: `server.ts` is the only thing that ever serves
+`index.html` for it (the deployed website is served as static files by SWA/nginx and never runs
+`server.ts`), so it injects a `window.__EV_DESKTOP__` flag that `desktopLandingGuard` checks to
+skip the marketing landing page and go straight to `/login` (or `/vault` if a refresh cookie
+already restored the session).
+
+Testing a Linux build under WSL2/WSLg works (`deno desktop --target x86_64-unknown-linux-gnu`),
+but use the raw directory output rather than `.AppImage` - WSL usually lacks the FUSE support
+AppImages need to mount themselves.
 
 ## Auth design notes
 

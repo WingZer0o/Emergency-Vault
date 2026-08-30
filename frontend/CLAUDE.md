@@ -17,6 +17,21 @@ To run a single test file/spec with Vitest, pass a path filter, e.g. `npx vitest
 
 Prettier config is in `.prettierrc` (100-char width, single quotes, Angular parser for `.html`).
 
+### Desktop app (`deno.json` tasks)
+
+```bash
+deno task dev                              # deno desktop + ng serve HMR, proxies /api to localhost:8080
+deno task desktop-build:local              # compiles emergency-vault.exe against localhost:8080
+deno task desktop-build:prod               # compiles against the deployed backend
+deno task installer                        # ISCC.exe installer/EmergencyVault.iss (needs Inno Setup locally)
+deno task desktop-build:prod:installer:windows  # both of the above chained - what CI runs
+```
+
+`server.ts` is the desktop app's runtime shell (and `deno task dev`'s dev server) - it's never
+used for the deployed website, which SWA/nginx serve as static files instead. See the root
+`README.md`'s "Desktop app" section for the full CI build/sign/publish pipeline
+(`build_desktop_installer` in `deploy.yml`).
+
 ## Architecture
 
 Angular 22, standalone components (no `NgModule`s) with signals for state, Angular Material for UI.
@@ -29,5 +44,6 @@ Angular 22, standalone components (no `NgModule`s) with signals for state, Angul
   - `guards/auth.guard.ts` — redirects to `/login` if not authenticated. `guards/role.guard.ts` — a factory (`roleGuard(...roles)`) for role-gated routes; currently defined but not wired into `app.routes.ts` (no admin-only screen exists yet).
 - **`features/`** — route-level components, one folder per screen (`auth/login`, `auth/register`, `auth/forgot-password`, `auth/reset-password`, `auth/confirm-email`, `dashboard`). All routes are lazy-loaded via `loadComponent` in `app.routes.ts`. Only `/profile` is guarded.
 - **`environments/`** — `apiUrl` is `/api` in every build. In dev, `ng serve`'s dev-server proxy (`proxy.conf.json`) forwards `/api` to the backend on `:8080`; in Docker/production, nginx (or the SWA-linked backend) reverse-proxies it. All same-origin, avoiding CORS/cross-site-cookie issues entirely.
+- **Desktop mode** — `core/utils/desktop.util.ts`'s `isDesktopApp()` reads a `window.__EV_DESKTOP__` flag that only the compiled desktop app's `server.ts` ever injects (see the "Desktop app" section in the root `README.md`). `core/guards/desktop-landing.guard.ts` uses it to skip the marketing landing page (`features/landing/`) on the `''` route, sending straight to `/login` or `/vault`. `core/services/downloads.service.ts` fetches the public `manifest.json` from blob storage that the landing page's `shared/download-links/` component renders as per-platform download buttons — extensible: a new platform just needs a `KNOWN_PLATFORMS` entry there once CI publishes a manifest key for it.
 
 This app is purely a client for the ASP.NET Core API in `../backend` — see `../backend/CLAUDE.md` and the root `README.md` for the auth/token design it depends on (ES512 access tokens, httpOnly refresh cookie scoped to `/api/auth`, email-code two-factor flow).
