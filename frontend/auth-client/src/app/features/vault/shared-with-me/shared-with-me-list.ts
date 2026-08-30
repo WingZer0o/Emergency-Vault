@@ -26,8 +26,6 @@ import { VaultService } from '../../../core/services/vault.service';
 import { Paginator } from '../../../shared/paginator/paginator';
 import { SearchQueryBar } from '../../../components/search-query-bar/search-query-bar';
 import { extractErrorMessage } from '../../auth/auth-error.util';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { debounceTime } from 'rxjs';
 
 @Component({
   selector: 'app-shared-with-me-list',
