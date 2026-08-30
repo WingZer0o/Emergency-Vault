@@ -128,3 +128,75 @@ jobs:
           app_location: "frontend/auth-client/dist/auth-client/browser"
           output_location: ""
           skip_app_build: true
+
+  build_desktop_installer:
+    needs: [changes, frontend_tests, deploy_backend]
+    if: |
+      always() &&
+      needs.changes.outputs.frontend == 'true' &&
+      needs.frontend_tests.result == 'success' &&
+      (needs.deploy_backend.result == 'success' || needs.deploy_backend.result == 'skipped')
+    runs-on: windows-latest
+    name: Build Desktop Installer
+    permissions:
+      contents: write # job-level override: needs to create a tag + release, unlike the rest of the workflow
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full tag history to compute the next version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.x" # deno desktop requires >=2.9; latest 2.x is 2.9.6
+
+      - name: Determine next version
+        id: version
+        shell: bash
+        run: |
+          latest=$(git tag --list 'desktop-v*' | sort -V | tail -n1)
+          if [ -z "$latest" ]; then
+            next="1.0.0"
+          else
+            ver=${latest#desktop-v}
+            IFS='.' read -r major minor patch <<< "$ver"
+            next="$major.$minor.$((patch + 1))"
+          fi
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=desktop-v$next" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version into installer script
+        shell: bash
+        working-directory: frontend/auth-client
+        run: sed -i "s/^AppVersion=.*/AppVersion=${{ steps.version.outputs.version }}/" installer/EmergencyVault.iss
+
+      - name: Install deps and build Angular app
+        working-directory: frontend/auth-client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Compile desktop binary
+        working-directory: frontend/auth-client
+        run: deno task desktop-build:prod
+
+      - name: Compile Inno Setup installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.9
+        with:
+          path: frontend/auth-client/installer/EmergencyVault.iss
+
+      - name: Rename installer with version
+        shell: bash
+        working-directory: frontend/auth-client/installer
+        run: mv EmergencyVaultSetup.exe "EmergencyVault-Setup-v${{ steps.version.outputs.version }}.exe"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Emergency Vault Desktop v${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          files: frontend/auth-client/installer/EmergencyVault-Setup-v${{ steps.version.outputs.version }}.exe
