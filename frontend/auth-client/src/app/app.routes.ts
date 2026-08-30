@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
+import { desktopLandingGuard } from './core/guards/desktop-landing.guard';
 import { roleGuard } from './core/guards/role.guard';
 import { subscriptionGuard } from './core/guards/subscription.guard';
 import { vaultSetupGuard } from './core/guards/vault-setup.guard';
@@ -11,6 +12,7 @@ export const routes: Routes = [
     path: '',
     pathMatch: 'full',
     title: 'Emergency Vault',
+    canActivate: [desktopLandingGuard],
     loadComponent: () => import('./features/landing/landing').then((m) => m.Landing),
   },
   {

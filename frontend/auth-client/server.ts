@@ -33,6 +33,18 @@ const API_PROXY_TARGET = await resolveApiProxyTarget();
 // full page reload after each `ng build --watch` rebuild.
 const ANGULAR_DEV_SERVER = Deno.env.get("ANGULAR_DEV_SERVER");
 
+// Flags the compiled app to Angular (see core/utils/desktop.util.ts) so it can skip the web
+// marketing landing page and go straight to login/the app instead. Only this desktop server
+// ever serves index.html this way - the deployed website (Static Web App/nginx) serves the
+// prebuilt dist/ directly and never runs server.ts, so the flag can't leak there. Not injected
+// for the ANGULAR_DEV_SERVER proxy path below (`deno task dev`) since that serves ng serve's
+// raw HTML untouched - only the compiled --output build gets the flag.
+async function serveIndexHtml(): Promise<Response> {
+  const html = await Deno.readTextFile(`${DIST}/index.html`);
+  const injected = html.replace("<head>", "<head><script>window.__EV_DESKTOP__=true;</script>");
+  return new Response(injected, { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
 function proxyWebSocket(req: Request, target: string): Response {
   const url = new URL(req.url);
   const upstreamUrl = new URL(url.pathname + url.search, target);
@@ -140,10 +152,13 @@ Deno.serve(async (req) => {
       return await proxyHttp(req, ANGULAR_DEV_SERVER);
     }
 
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      return await serveIndexHtml();
+    }
+
     const res = await serveDir(req, { fsRoot: DIST, quiet: true });
     if (res.status === 404) {
-      const index = await Deno.readFile(`${DIST}/index.html`);
-      return new Response(index, { headers: { "content-type": "text/html" } });
+      return await serveIndexHtml();
     }
     return res;
   } catch (err) {
