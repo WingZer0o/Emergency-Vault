@@ -1,4 +1,13 @@
-import { Component, OnInit, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  Signal,
+  computed,
+  inject,
+  linkedSignal,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -42,42 +51,38 @@ export class SharedWithMeList implements OnInit {
   private readonly router = inject(Router);
   private readonly pagination = inject(PaginationService);
 
+  private readonly sharesSearchQueryBar =
+    viewChild.required<SearchQueryBar>('sharesSearchQueryBar');
+  private readonly itemSharesSearchQueryBar = viewChild.required<SearchQueryBar>(
+    'itemSharesSearchQueryBar',
+  );
+
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
   readonly shares = signal<VaultSharedWithMeDto[]>([]);
   /** Items shared with the current user individually - separate from shares(), which is whole-vault only. */
   readonly itemShares = signal<VaultItemShareDto[]>([]);
 
-  /** Two independent search boxes and paginators on one screen - each tracks its own query and
-   * page, both paginators share the app-wide page size. */
-  readonly sharesSearchQuery = signal<string | null>(null);
-  private readonly debouncedSharesSearchQuery = toSignal(
-    toObservable(this.sharesSearchQuery).pipe(debounceTime(200)),
-    { initialValue: null },
-  );
-  
-  readonly itemSharesSearchQuery = signal<string | null>(null);
-  private readonly debouncedItemSharesSearchQuery = toSignal(
-    toObservable(this.itemSharesSearchQuery).pipe(debounceTime(200)),
-    { initialValue: null },
-  );
-
   readonly filteredShares: Signal<VaultSharedWithMeDto[]> = computed(() => {
-    const query = this.debouncedSharesSearchQuery()?.toLowerCase() ?? '';
+    const query = this.sharesSearchQueryBar().debouncedSearchQuery()?.toLowerCase().trim() ?? '';
     if (!query) return this.shares();
     return this.shares().filter((share) => share.ownerName.toLowerCase().includes(query));
   });
   readonly filteredItemShares: Signal<VaultItemShareDto[]> = computed(() => {
-    const query = this.debouncedItemSharesSearchQuery()?.toLowerCase() ?? '';
+    const query =
+      this.itemSharesSearchQueryBar().debouncedSearchQuery()?.toLowerCase().trim() ?? '';
     if (!query) return this.itemShares();
     return this.itemShares().filter((share) => share.ownerName.toLowerCase().includes(query));
   });
 
   // Editing a query re-filters the list under its paginator, so send the user back to page 1
   // rather than leaving them stranded past the end of a now-shorter list.
-  readonly sharesPageIndex = linkedSignal({ source: this.sharesSearchQuery, computation: () => 0 });
+  readonly sharesPageIndex = linkedSignal({
+    source: () => this.sharesSearchQueryBar().debouncedSearchQuery(),
+    computation: () => 0,
+  });
   readonly itemSharesPageIndex = linkedSignal({
-    source: this.itemSharesSearchQuery,
+    source: () => this.itemSharesSearchQueryBar().debouncedSearchQuery(),
     computation: () => 0,
   });
 
