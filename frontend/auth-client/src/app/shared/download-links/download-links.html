@@ -1,0 +1,29 @@
+@if (manifest(); as m) {
+  <div class="download-grid">
+    @for (platform of platforms; track platform.id) {
+      @if (m[platform.id]; as entry) {
+        <a
+          class="download-card available"
+          [class.recommended]="platform.id === detectedPlatform"
+          [href]="entry.url"
+        >
+          @if (platform.id === detectedPlatform) {
+            <span class="tag tag-accent">Recommended for your system</span>
+          }
+          <span class="platform">{{ platform.label }}</span>
+          <span class="file-hint text-muted">{{ platform.fileHint }} &middot; v{{ entry.version }}</span>
+          <span class="btn btn-primary download-btn">Download</span>
+        </a>
+      } @else {
+        <div class="download-card unavailable">
+          <span class="platform">{{ platform.label }}</span>
+          <span class="file-hint text-muted">Coming soon</span>
+        </div>
+      }
+    }
+  </div>
+} @else if (loadFailed()) {
+  <p class="text-muted">Downloads are temporarily unavailable. Please try again shortly.</p>
+} @else {
+  <p class="text-muted">Loading downloads&hellip;</p>
+}

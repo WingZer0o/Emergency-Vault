@@ -231,3 +231,40 @@ jobs:
           name: "Emergency Vault Desktop v${{ steps.version.outputs.version }}"
           generate_release_notes: true
           files: frontend/auth-client/installer/EmergencyVault-Setup-v${{ steps.version.outputs.version }}.exe
+
+      - name: Publish to public downloads storage
+        shell: bash
+        working-directory: frontend/auth-client/installer
+        run: |
+          az storage blob upload \
+            --account-name evdownloads \
+            --container-name downloads \
+            --name windows/EmergencyVault-Setup-latest.exe \
+            --file "EmergencyVault-Setup-v${{ steps.version.outputs.version }}.exe" \
+            --content-type application/octet-stream \
+            --overwrite \
+            --auth-mode login
+
+          # Merge into the existing manifest rather than overwrite it outright, so this job
+          # doesn't clobber macOS/Linux entries a future build-and-publish job adds alongside it.
+          az storage blob download \
+            --account-name evdownloads \
+            --container-name downloads \
+            --name manifest.json \
+            --file manifest.json \
+            --auth-mode login \
+            2>/dev/null || echo '{}' > manifest.json
+
+          jq --arg version "${{ steps.version.outputs.version }}" \
+            '.windows = {version: $version, url: "https://evdownloads.blob.core.windows.net/downloads/windows/EmergencyVault-Setup-latest.exe"}' \
+            manifest.json > manifest.next.json
+          mv manifest.next.json manifest.json
+
+          az storage blob upload \
+            --account-name evdownloads \
+            --container-name downloads \
+            --name manifest.json \
+            --file manifest.json \
+            --content-type application/json \
+            --overwrite \
+            --auth-mode login

@@ -4,6 +4,7 @@
     <a (click)="scrollToSection('how-it-works')" class="nav-link">How it works</a>
     <a (click)="scrollToSection('cryptography')" class="nav-link">Cryptography</a>
     <a (click)="scrollToSection('use-cases')" class="nav-link">For executors</a>
+    <a (click)="scrollToSection('download')" class="nav-link">Download</a>
     <a href="mailto:support@emergencyvault.net" class="nav-link">Support</a>
     @if (authService.isAuthenticated()) {
       <a class="btn btn-primary" routerLink="/profile" style="margin-left: 8px">Go to profile</a>
@@ -18,7 +19,7 @@
       <h1>The credentials your family will need. Sealed so only they can open them.</h1>
       <p class="lead">
         Power-of-attorney logins, institution portals, point-of-death paperwork — encrypted in
-        your browser before anything leaves it. We hold ciphertext and nothing else. 123
+        your browser before anything leaves it. We hold ciphertext and nothing else.
       </p>
       <p class="text-muted">
         Your password never reaches our servers. Neither does a key that could decrypt your
@@ -181,6 +182,11 @@
         </table>
       </div>
     </div>
+  </section>
+
+  <section class="section-block" id="download">
+    <h6>Get the app</h6>
+    <app-download-links />
   </section>
 
   <section class="banner">
