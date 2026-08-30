@@ -62,7 +62,7 @@ export class VaultItemList implements OnInit {
   readonly pageIndex = linkedSignal({ source: this.debouncedSearchQuery, computation: () => 0 });
   readonly pagedItems = this.pagination.slice(this.filteredItems, this.pageIndex);
 
-  readonly displayedColumns = ['record', 'type', 'actions'];
+  readonly displayedColumns = ['record', 'type', 'view', 'delete'];
 
   readonly checkingHealth = signal(false);
   readonly breachedItemIds = signal<ReadonlySet<string>>(new Set());
