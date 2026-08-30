@@ -1,4 +1,6 @@
 import { Component, OnInit, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -46,14 +48,18 @@ export class VaultItemList implements OnInit {
 
   readonly items = signal<DecryptedVaultItem[]>([]);
   readonly searchQuery = signal<string | null>(null);
+  private readonly debouncedSearchQuery = toSignal(
+    toObservable(this.searchQuery).pipe(debounceTime(200)),
+    { initialValue: null },
+  );
   readonly filteredItems: Signal<DecryptedVaultItem[]> = computed(() => {
-    const query = this.searchQuery()?.toLowerCase() ?? '';
+    const query = this.debouncedSearchQuery()?.toLowerCase() ?? '';
     if (!query) return this.items();
     return this.items().filter(item => item.label.toLowerCase().includes(query));
   });
   // Editing the query re-filters the list under the paginator, so send the user back to page 1
   // rather than leaving them stranded past the end of a now-shorter list.
-  readonly pageIndex = linkedSignal({ source: this.searchQuery, computation: () => 0 });
+  readonly pageIndex = linkedSignal({ source: this.debouncedSearchQuery, computation: () => 0 });
   readonly pagedItems = this.pagination.slice(this.filteredItems, this.pageIndex);
 
   readonly displayedColumns = ['record', 'type', 'actions'];

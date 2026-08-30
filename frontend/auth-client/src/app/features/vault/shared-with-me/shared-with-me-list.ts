@@ -7,12 +7,18 @@ import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { VaultItemShareDto, VaultShareStatus, VaultSharedWithMeDto } from '../../../core/models/vault.models';
+import {
+  VaultItemShareDto,
+  VaultShareStatus,
+  VaultSharedWithMeDto,
+} from '../../../core/models/vault.models';
 import { PaginationService } from '../../../core/services/pagination.service';
 import { VaultService } from '../../../core/services/vault.service';
 import { Paginator } from '../../../shared/paginator/paginator';
 import { SearchQueryBar } from '../../../components/search-query-bar/search-query-bar';
 import { extractErrorMessage } from '../../auth/auth-error.util';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 
 @Component({
   selector: 'app-shared-with-me-list',
@@ -45,15 +51,24 @@ export class SharedWithMeList implements OnInit {
   /** Two independent search boxes and paginators on one screen - each tracks its own query and
    * page, both paginators share the app-wide page size. */
   readonly sharesSearchQuery = signal<string | null>(null);
+  private readonly debouncedSharesSearchQuery = toSignal(
+    toObservable(this.sharesSearchQuery).pipe(debounceTime(200)),
+    { initialValue: null },
+  );
+  
   readonly itemSharesSearchQuery = signal<string | null>(null);
+  private readonly debouncedItemSharesSearchQuery = toSignal(
+    toObservable(this.itemSharesSearchQuery).pipe(debounceTime(200)),
+    { initialValue: null },
+  );
 
   readonly filteredShares: Signal<VaultSharedWithMeDto[]> = computed(() => {
-    const query = this.sharesSearchQuery()?.toLowerCase() ?? '';
+    const query = this.debouncedSharesSearchQuery()?.toLowerCase() ?? '';
     if (!query) return this.shares();
     return this.shares().filter((share) => share.ownerName.toLowerCase().includes(query));
   });
   readonly filteredItemShares: Signal<VaultItemShareDto[]> = computed(() => {
-    const query = this.itemSharesSearchQuery()?.toLowerCase() ?? '';
+    const query = this.debouncedItemSharesSearchQuery()?.toLowerCase() ?? '';
     if (!query) return this.itemShares();
     return this.itemShares().filter((share) => share.ownerName.toLowerCase().includes(query));
   });
@@ -61,10 +76,16 @@ export class SharedWithMeList implements OnInit {
   // Editing a query re-filters the list under its paginator, so send the user back to page 1
   // rather than leaving them stranded past the end of a now-shorter list.
   readonly sharesPageIndex = linkedSignal({ source: this.sharesSearchQuery, computation: () => 0 });
-  readonly itemSharesPageIndex = linkedSignal({ source: this.itemSharesSearchQuery, computation: () => 0 });
+  readonly itemSharesPageIndex = linkedSignal({
+    source: this.itemSharesSearchQuery,
+    computation: () => 0,
+  });
 
   readonly pagedShares = this.pagination.slice(this.filteredShares, this.sharesPageIndex);
-  readonly pagedItemShares = this.pagination.slice(this.filteredItemShares, this.itemSharesPageIndex);
+  readonly pagedItemShares = this.pagination.slice(
+    this.filteredItemShares,
+    this.itemSharesPageIndex,
+  );
 
   /** Which share's inline "enter code" form is currently open, if any - shareId is unique across
    * both shares() and itemShares(), so one signal covers whichever list it came from. */

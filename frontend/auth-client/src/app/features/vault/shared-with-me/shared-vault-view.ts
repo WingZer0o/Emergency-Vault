@@ -1,7 +1,7 @@
 import { Component, OnInit, Signal, computed, inject, linkedSignal, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { debounceTime, firstValueFrom } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -19,6 +19,7 @@ import { relativeTime } from '../../../core/utils/relative-time.util';
 import { Paginator } from '../../../shared/paginator/paginator';
 import { SearchQueryBar } from '../../../components/search-query-bar/search-query-bar';
 import { extractErrorMessage } from '../../auth/auth-error.util';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 
 /**
  * Lists the items in a shared vault so a holder can pick one to open. Listing itself is never
@@ -60,8 +61,12 @@ export class SharedVaultView implements OnInit {
   readonly ownerName = signal('');
   readonly items = signal<DecryptedVaultItem[]>([]);
   readonly searchQuery = signal<string | null>(null);
+  private readonly debouncedSearchQuery = toSignal(
+    toObservable(this.searchQuery).pipe(debounceTime(200)),
+    { initialValue: null },
+  );
   readonly filteredItems: Signal<DecryptedVaultItem[]> = computed(() => {
-    const query = this.searchQuery()?.toLowerCase() ?? '';
+    const query = this.debouncedSearchQuery()?.toLowerCase() ?? '';
     if (!query) return this.items();
     return this.items().filter((item) => item.label.toLowerCase().includes(query));
   });
