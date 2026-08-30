@@ -140,6 +140,7 @@ jobs:
     name: Build Desktop Installer
     permissions:
       contents: write # job-level override: needs to create a tag + release, unlike the rest of the workflow
+      id-token: write # needed for the OIDC azure/login step below (job-level permissions replace, not merge, the workflow defaults)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -148,6 +149,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - uses: denoland/setup-deno@v2
         with:
@@ -183,10 +190,34 @@ jobs:
         working-directory: frontend/auth-client
         run: deno task desktop-build:prod
 
+      - name: Sign desktop binary
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: emergency-vault
+          certificate-profile-name: emergency-vault-public
+          files-folder: ${{ github.workspace }}/frontend/auth-client/emergency-vault
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       - name: Compile Inno Setup installer
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.9
         with:
           path: frontend/auth-client/installer/EmergencyVault.iss
+
+      - name: Sign installer
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: emergency-vault
+          certificate-profile-name: emergency-vault-public
+          files-folder: ${{ github.workspace }}/frontend/auth-client/installer
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Rename installer with version
         shell: bash
