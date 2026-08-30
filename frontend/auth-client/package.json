@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "compile-dev": "ng build --watch",
     "build:azure": "ng build --configuration azure",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"

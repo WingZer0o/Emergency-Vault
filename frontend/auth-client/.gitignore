@@ -5,6 +5,10 @@
 /tmp
 /out-tsc
 /bazel-out
+/api-target.txt
+/emergency-vault*
+/proxy-debug.log
+/installer/EmergencyVaultSetup.exe
 
 # Node
 /node_modules
