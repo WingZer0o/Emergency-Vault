@@ -36,7 +36,7 @@
     <p class="error-text">{{ message }}</p>
   } @else {
     <div class="vault-body">
-      <app-search-query-bar [(searchQuery)]="searchQuery"></app-search-query-bar>
+      <app-search-query-bar #searchQueryBar></app-search-query-bar>
 
       <table mat-table [dataSource]="pagedItems()" class="records-table">
         <ng-container matColumnDef="record">
