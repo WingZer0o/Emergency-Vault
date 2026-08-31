@@ -1,4 +1,5 @@
 using EmergencyVault.Api.Extensions;
+using EmergencyVault.Application.Dtos;
 using EmergencyVault.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,20 +21,20 @@ public class BillingController(IBillingService billingService, ILogger<BillingCo
 
     [HttpPost("checkout-session")]
     [Authorize(Roles = "User")]
-    public async Task<IActionResult> CreateCheckoutSession(CancellationToken ct)
+    public async Task<IActionResult> CreateCheckoutSession([FromBody] CreateCheckoutSessionRequest request, CancellationToken ct)
     {
-        var session = await billingService.CreateCheckoutSessionAsync(User.GetUserId(), ct);
+        var session = await billingService.CreateCheckoutSessionAsync(User.GetUserId(), request.IsDesktop, ct);
         return Ok(session);
     }
 
     /// <summary>Stripe-hosted portal where a user can update their card or cancel, without us building either flow.</summary>
     [HttpPost("portal-session")]
     [Authorize(Roles = "User")]
-    public async Task<IActionResult> CreatePortalSession(CancellationToken ct)
+    public async Task<IActionResult> CreatePortalSession([FromBody] CreatePortalSessionRequest request, CancellationToken ct)
     {
         try
         {
-            var session = await billingService.CreatePortalSessionAsync(User.GetUserId(), ct);
+            var session = await billingService.CreatePortalSessionAsync(User.GetUserId(), request.IsDesktop, ct);
             return Ok(session);
         }
         catch (InvalidOperationException)

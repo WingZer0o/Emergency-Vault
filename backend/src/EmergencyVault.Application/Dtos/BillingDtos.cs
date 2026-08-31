@@ -30,3 +30,10 @@ public record AdminSubscriptionRowDto(
     bool IsFreeAccess);
 
 public record SetFreeAccessRequest([Required] bool IsFreeAccess);
+
+// IsDesktop only ever picks between two server-controlled origins (see BillingService's
+// DesktopReturnOrigin) - it can't be turned into an open redirect the way a caller-supplied
+// URL could.
+public record CreateCheckoutSessionRequest(bool IsDesktop);
+
+public record CreatePortalSessionRequest(bool IsDesktop);

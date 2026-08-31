@@ -10,6 +10,7 @@ import {
   CheckoutSessionResponse,
   UpdateBillingSettingsRequest,
 } from '../models/billing.models';
+import { isDesktopApp } from '../utils/desktop.util';
 
 @Injectable({ providedIn: 'root' })
 export class BillingService {
@@ -23,12 +24,16 @@ export class BillingService {
 
   /** Requests a Stripe Checkout session and redirects the browser to it. */
   startCheckout(): Observable<CheckoutSessionResponse> {
-    return this.http.post<CheckoutSessionResponse>(`${this.baseUrl}/checkout-session`, {});
+    return this.http.post<CheckoutSessionResponse>(`${this.baseUrl}/checkout-session`, {
+      isDesktop: isDesktopApp(),
+    });
   }
 
   /** Requests a Stripe Billing Portal session (update card / cancel) and redirects the browser to it. */
   openPortal(): Observable<CheckoutSessionResponse> {
-    return this.http.post<CheckoutSessionResponse>(`${this.baseUrl}/portal-session`, {});
+    return this.http.post<CheckoutSessionResponse>(`${this.baseUrl}/portal-session`, {
+      isDesktop: isDesktopApp(),
+    });
   }
 
   getSettings(): Observable<BillingSettings> {
