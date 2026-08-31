@@ -119,6 +119,12 @@ public class FakeVaultRepository : IVaultRepository
         Task.FromResult<IReadOnlyList<VaultItemView>>(
             ItemViews.Where(v => v.VaultItemId == vaultItemId).OrderByDescending(v => v.ViewedAt).Take(50).ToList());
 
+    public Task RemoveAllItemViewsByViewerAsync(Guid viewerUserId, CancellationToken ct)
+    {
+        ItemViews.RemoveAll(v => v.ViewerUserId == viewerUserId);
+        return Task.CompletedTask;
+    }
+
     public Task RemoveAllItemRevisionsForItemAsync(Guid changedByUserId, CancellationToken ct)
     {
         ItemRevisions.RemoveAll(r => r.ChangedByUserId == changedByUserId);

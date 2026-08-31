@@ -159,6 +159,11 @@ public class VaultRepository(AppDbContext db) : IVaultRepository
             .ToListAsync(ct);
     }
 
+    public async Task RemoveAllItemViewsByViewerAsync(Guid viewerUserId, CancellationToken ct)
+    {
+        await db.VaultItemViews.Where(v => v.ViewerUserId == viewerUserId).ExecuteDeleteAsync(ct);
+    }
+
     public async Task RemoveAllItemRevisionsForItemAsync(Guid changedByUserId, CancellationToken ct)
     {
         await db.VaultItemRevisions.Where(r => r.ChangedByUserId == changedByUserId).ExecuteDeleteAsync(ct);

@@ -606,14 +606,17 @@ public class AuthService(
         try
         {
             // Must run before UserManager.DeleteAsync: VaultProfile, owned VaultItems and granted
-            // VaultKeyShares all cascade-delete with the user, but VaultKeyShare.Holder and
-            // VaultItemRevision.ChangedBy are both Restrict FKs (see AppDbContext), so any share this
-            // user holds - including their own self-share - or any revision they ever recorded (even
-            // on someone else's item, via edit access) would otherwise block the delete with a FK
-            // constraint violation. Sequential, not Task.WhenAll: both run ExecuteDeleteAsync against
-            // the same DbContext/connection, which isn't safe to do concurrently without MARS.
+            // VaultKeyShares all cascade-delete with the user, but VaultKeyShare.Holder,
+            // VaultItemRevision.ChangedBy and VaultItemView.Viewer are all Restrict FKs (see
+            // AppDbContext), so any share this user holds - including their own self-share - any
+            // revision they ever recorded (even on someone else's item, via edit access), or any
+            // view they ever recorded on someone else's shared item would otherwise block the
+            // delete with a FK constraint violation. Sequential, not Task.WhenAll: all three run
+            // ExecuteDeleteAsync against the same DbContext/connection, which isn't safe to do
+            // concurrently without MARS.
             await vaultRepository.DeleteHoldersSharesByIdAsync(userId, ct);
             await vaultRepository.RemoveAllItemRevisionsForItemAsync(userId, ct);
+            await vaultRepository.RemoveAllItemViewsByViewerAsync(userId, ct);
             // Stripe has no idea the account is about to disappear - cancel any active/past-due
             // subscription first so the user doesn't keep getting billed after their account is gone.
             // The Subscriptions row itself cascade-deletes with the user (see AppDbContext).
