@@ -28,5 +28,8 @@
     "desktop-build:prod:cef-test": "rm -rf ./emergency-vault && deno run -A ./write-api-target.ts https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io && deno desktop -A --backend cef --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
     "installer:windows": "ISCC.exe installer/EmergencyVault.iss",
     "desktop-build:prod:installer:windows": "deno task build-angular:windows && deno task desktop-build:prod && deno task installer:windows"
+  },
+  "allowScripts": {
+    "allow": ["npm:@parcel/watcher@2.6.0", "npm:esbuild@0.28.2", "npm:lmdb@3.5.6", "npm:msgpackr-extract@3.0.4"]
   }
 }

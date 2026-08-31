@@ -2,5 +2,6 @@
   "deno.enable": true,
   "deno.enablePaths": ["frontend/auth-client"],
   "deno.config": "frontend/auth-client/deno.json",
+  "deno.importMap": "frontend/auth-client/deno.json",
   "deno.lint": true
 }
