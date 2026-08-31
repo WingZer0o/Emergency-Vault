@@ -16,8 +16,46 @@ public class BillingService(
     {
         var subscription = await repository.GetSubscriptionAsync(userId, ct);
         var settings = await repository.GetSettingsAsync(ct);
+        return BuildStatusDto(subscription, settings);
+    }
 
-        return new BillingStatusDto(
+    public async Task<BillingStatusDto> SyncStatusAsync(Guid userId, CancellationToken ct)
+    {
+        var subscription = await repository.GetSubscriptionAsync(userId, ct);
+
+        if (!string.IsNullOrEmpty(subscription?.StripeSubscriptionId))
+        {
+            var live = await stripeGateway.GetSubscriptionStateAsync(subscription.StripeSubscriptionId, ct);
+            if (live is not null)
+            {
+                var (status, currentPeriodEnd) = live.Value;
+                var changed = false;
+
+                if (status is not null && subscription.Status != status)
+                {
+                    subscription.Status = status.Value;
+                    changed = true;
+                }
+                if (currentPeriodEnd is not null && subscription.CurrentPeriodEnd != currentPeriodEnd)
+                {
+                    subscription.CurrentPeriodEnd = currentPeriodEnd;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    subscription.UpdatedAt = DateTimeOffset.UtcNow;
+                    await repository.SaveChangesAsync(ct);
+                }
+            }
+        }
+
+        var settings = await repository.GetSettingsAsync(ct);
+        return BuildStatusDto(subscription, settings);
+    }
+
+    private static BillingStatusDto BuildStatusDto(Subscription? subscription, BillingSetting settings) =>
+        new(
             subscription is not null && HasActiveEntitlement(subscription),
             subscription?.IsFreeAccess ?? false,
             subscription?.Status ?? SubscriptionStatus.None,
@@ -25,7 +63,6 @@ public class BillingService(
             settings.YearlyPriceCents,
             settings.Currency,
             !string.IsNullOrEmpty(subscription?.StripeCustomerId));
-    }
 
     // The compiled desktop app is a WebView2 window pointed at its own local server.ts, which
     // Deno.serve() (no explicit port passed) binds to this address by default. Sending Stripe's

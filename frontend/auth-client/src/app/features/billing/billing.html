@@ -10,18 +10,93 @@
       <p class="hint-text">Checkout was canceled - no charge was made.</p>
     }
 
-    @if (status.hasAccess) {
+    @if (status.isFreeAccess) {
       <div class="billing-tags">
-        @if (status.isFreeAccess) {
-          <span class="tag tag-accent">Free access</span>
-        } @else {
-          <span class="tag tag-accent">Active</span>
-        }
+        <span class="tag tag-accent">Free access</span>
+      </div>
+    } @else if (status.hasAccess && status.status === 'Active') {
+      <div class="billing-tags">
+        <span class="tag tag-accent">Active</span>
       </div>
       @if (status.currentPeriodEnd) {
         <p class="hint-text">Renews {{ status.currentPeriodEnd | date: 'longDate' }}.</p>
       }
+
+      @if (status.hasStripeCustomer) {
+        <div class="manage-billing">
+          @if (paymentMethodUpdated()) {
+            <p class="hint-text">Payment method updated.</p>
+          }
+
+          <div class="manage-billing-actions" [hidden]="managingPaymentMethod()">
+            <button
+              mat-stroked-button
+              [disabled]="updatingPaymentMethod()"
+              (click)="updatePaymentMethod()"
+            >
+              @if (updatingPaymentMethod()) {
+                <mat-progress-spinner diameter="18" mode="indeterminate" />
+              } @else {
+                Update payment method
+              }
+            </button>
+            <button
+              mat-stroked-button
+              color="warn"
+              [disabled]="canceling()"
+              (click)="cancelSubscription()"
+            >
+              @if (canceling()) {
+                <mat-progress-spinner diameter="18" mode="indeterminate" />
+              } @else {
+                Cancel membership
+              }
+            </button>
+          </div>
+
+          <div
+            class="payment-method-container"
+            [hidden]="!managingPaymentMethod()"
+            #paymentMethodContainer
+          ></div>
+          @if (managingPaymentMethod()) {
+            <div class="manage-billing-actions">
+              <button
+                mat-flat-button
+                color="primary"
+                [disabled]="updatingPaymentMethod()"
+                (click)="confirmPaymentMethod()"
+              >
+                @if (updatingPaymentMethod()) {
+                  <mat-progress-spinner diameter="18" mode="indeterminate" />
+                } @else {
+                  Save card
+                }
+              </button>
+              <button
+                mat-stroked-button
+                [disabled]="updatingPaymentMethod()"
+                (click)="cancelPaymentMethodUpdate()"
+              >
+                Cancel
+              </button>
+            </div>
+          }
+        </div>
+      }
     } @else {
+      @if (status.status === 'Canceled') {
+        <div class="billing-tags">
+          <span class="tag tag-neutral">Canceled</span>
+        </div>
+        @if (status.hasAccess && status.currentPeriodEnd) {
+          <p class="hint-text">
+            Your membership won't renew. Access continues until
+            {{ status.currentPeriodEnd | date: 'longDate' }}.
+          </p>
+        }
+      }
+
       @if (justSucceeded()) {
         <p class="hint-text">
           Payment received - activating your membership. This can take a few seconds.
@@ -42,7 +117,8 @@
           @if (starting()) {
             <mat-progress-spinner diameter="18" mode="indeterminate" />
           } @else {
-            Subscribe - {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
+            {{ status.status === 'Canceled' ? 'Reactivate' : 'Subscribe' }} -
+            {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
           }
         </button>
 
@@ -51,69 +127,6 @@
           <button mat-stroked-button (click)="cancelCheckout()">Cancel</button>
         }
       }
-    }
-
-    @if (status.hasStripeCustomer) {
-      <div class="manage-billing">
-        @if (paymentMethodUpdated()) {
-          <p class="hint-text">Payment method updated.</p>
-        }
-
-        <div class="manage-billing-actions" [hidden]="managingPaymentMethod()">
-          <button
-            mat-stroked-button
-            [disabled]="updatingPaymentMethod()"
-            (click)="updatePaymentMethod()"
-          >
-            @if (updatingPaymentMethod()) {
-              <mat-progress-spinner diameter="18" mode="indeterminate" />
-            } @else {
-              Update payment method
-            }
-          </button>
-          <button
-            mat-stroked-button
-            color="warn"
-            [disabled]="canceling()"
-            (click)="cancelSubscription()"
-          >
-            @if (canceling()) {
-              <mat-progress-spinner diameter="18" mode="indeterminate" />
-            } @else {
-              Cancel membership
-            }
-          </button>
-        </div>
-
-        <div
-          class="payment-method-container"
-          [hidden]="!managingPaymentMethod()"
-          #paymentMethodContainer
-        ></div>
-        @if (managingPaymentMethod()) {
-          <div class="manage-billing-actions">
-            <button
-              mat-flat-button
-              color="primary"
-              [disabled]="updatingPaymentMethod()"
-              (click)="confirmPaymentMethod()"
-            >
-              @if (updatingPaymentMethod()) {
-                <mat-progress-spinner diameter="18" mode="indeterminate" />
-              } @else {
-                Save card
-              }
-            </button>
-            <button
-              mat-stroked-button
-              [disabled]="updatingPaymentMethod()"
-              (click)="cancelPaymentMethodUpdate()"
-            >
-              Cancel
-            </button>
-          </div>
-        }
-      </div>
     }
 
     @if (errorMessage(); as message) {

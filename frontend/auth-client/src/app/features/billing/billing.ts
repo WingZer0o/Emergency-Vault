@@ -52,7 +52,9 @@ export class Billing implements OnInit, OnDestroy {
     // here. See BillingService.CreateCheckoutSessionAsync/StripeGateway's RedirectOnCompletion comment.
     this.justSucceeded.set(this.route.snapshot.queryParamMap.get('success') === '1');
     this.justCanceled.set(this.route.snapshot.queryParamMap.get('canceled') === '1');
-    this.loadStatus();
+    // Reconciles against Stripe live rather than trusting our own DB, which only updates from
+    // webhooks - those can lag, or never arrive if the endpoint/secret is ever misconfigured.
+    this.loadStatus(true);
   }
 
   ngOnDestroy(): void {
@@ -221,7 +223,7 @@ export class Billing implements OnInit, OnDestroy {
   }
 
   refresh(): void {
-    this.loadStatus();
+    this.loadStatus(true);
   }
 
   formatPrice(cents: number, currency: string): string {
@@ -248,9 +250,10 @@ export class Billing implements OnInit, OnDestroy {
     return this.stripePromise;
   }
 
-  private loadStatus(): void {
+  /** sync: true reconciles against Stripe live first (page load, "Refresh status"); false trusts our own DB, already fresh right after our own write (checkout complete, payment method update, cancel). */
+  private loadStatus(sync = false): void {
     this.loading.set(true);
-    this.billingService.getStatus().subscribe({
+    (sync ? this.billingService.syncStatus() : this.billingService.getStatus()).subscribe({
       next: (status) => {
         this.status.set(status);
         this.loading.set(false);

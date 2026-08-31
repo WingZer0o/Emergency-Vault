@@ -5,6 +5,16 @@ namespace EmergencyVault.Application.Interfaces;
 public interface IBillingService
 {
     Task<BillingStatusDto> GetStatusAsync(Guid userId, CancellationToken ct);
+
+    /// <summary>
+    /// Same shape as GetStatusAsync, but first reconciles against Stripe directly rather than
+    /// relying on webhook delivery having already caught up (or arrived at all). Meant for the
+    /// billing page specifically (initial load, "Refresh status") - never called from
+    /// GetStatusAsync/ActiveSubscriptionHandler, which runs on every vault request and can't afford
+    /// a live Stripe round trip that often.
+    /// </summary>
+    Task<BillingStatusDto> SyncStatusAsync(Guid userId, CancellationToken ct);
+
     Task<EmbeddedCheckoutSessionDto> CreateCheckoutSessionAsync(Guid userId, bool isDesktop, CancellationToken ct);
 
     /// <summary>Throws InvalidOperationException if the user has no Stripe customer yet (never completed a checkout).</summary>

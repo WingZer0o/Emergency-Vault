@@ -24,6 +24,11 @@ export class BillingService {
     return this.http.get<BillingStatus>(`${this.baseUrl}/status`);
   }
 
+  /** Same as getStatus, but reconciles against Stripe live first - see IBillingService.SyncStatusAsync. Slower; use for the billing page's initial load and "Refresh status", not routine reads. */
+  syncStatus(): Observable<BillingStatus> {
+    return this.http.post<BillingStatus>(`${this.baseUrl}/sync-status`, {});
+  }
+
   /** Requests an embedded Stripe Checkout session, mounted client-side via Stripe.js rather than a redirect. */
   startCheckout(): Observable<EmbeddedCheckoutSessionResponse> {
     return this.http.post<EmbeddedCheckoutSessionResponse>(`${this.baseUrl}/checkout-session`, {

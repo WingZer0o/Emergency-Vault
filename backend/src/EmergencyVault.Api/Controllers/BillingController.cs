@@ -19,6 +19,15 @@ public class BillingController(IBillingService billingService, ILogger<BillingCo
         return Ok(status);
     }
 
+    /// <summary>Same as Status, but reconciles against Stripe live first - see IBillingService.SyncStatusAsync.</summary>
+    [HttpPost("sync-status")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> SyncStatus(CancellationToken ct)
+    {
+        var status = await billingService.SyncStatusAsync(User.GetUserId(), ct);
+        return Ok(status);
+    }
+
     [HttpPost("checkout-session")]
     [Authorize(Roles = "User")]
     public async Task<IActionResult> CreateCheckoutSession([FromBody] CreateCheckoutSessionRequest request, CancellationToken ct)

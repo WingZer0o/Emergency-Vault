@@ -57,5 +57,14 @@ public interface IStripeGateway
     /// <summary>Cancels a Stripe subscription immediately (not at period end) so no further charges occur.</summary>
     Task CancelSubscriptionAsync(string subscriptionId, CancellationToken ct);
 
+    /// <summary>
+    /// Fetches the current status/period-end directly from Stripe, for a live reconciliation check
+    /// (e.g. when the billing page loads) rather than waiting on webhook delivery, which can lag or
+    /// silently fail to arrive at all if the endpoint/secret is ever misconfigured. Null Status
+    /// means an unrecognized Stripe status (caller should leave its own value alone, same as the
+    /// webhook path does); a null return altogether means the subscription couldn't be fetched.
+    /// </summary>
+    Task<(SubscriptionStatus? Status, DateTimeOffset? CurrentPeriodEnd)?> GetSubscriptionStateAsync(string subscriptionId, CancellationToken ct);
+
     ParsedStripeEvent ConstructWebhookEvent(string payload, string signatureHeader);
 }

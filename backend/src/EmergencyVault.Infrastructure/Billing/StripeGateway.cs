@@ -126,6 +126,23 @@ public class StripeGateway : IStripeGateway
         await service.CancelAsync(subscriptionId, cancellationToken: ct);
     }
 
+    public async Task<(SubscriptionStatus? Status, DateTimeOffset? CurrentPeriodEnd)?> GetSubscriptionStateAsync(string subscriptionId, CancellationToken ct)
+    {
+        var service = new SubscriptionService();
+        Stripe.Subscription subscription;
+        try
+        {
+            subscription = await service.GetAsync(subscriptionId, cancellationToken: ct);
+        }
+        catch (StripeException)
+        {
+            // Couldn't reconcile (e.g. transient API error) - caller keeps whatever it already had.
+            return null;
+        }
+
+        return MapSubscriptionState(subscription);
+    }
+
     public ParsedStripeEvent ConstructWebhookEvent(string payload, string signatureHeader)
     {
         var webhookSecret = Environment.GetEnvironmentVariable(EnvironmentVariableConst.StripeWebhookSecret)
@@ -166,18 +183,7 @@ public class StripeGateway : IStripeGateway
         var subscription = stripeEvent.Data.Object as Stripe.Subscription
             ?? throw new InvalidOperationException($"Unexpected payload for {stripeEvent.Type}.");
 
-        var periodEndItem = subscription.Items.Data.FirstOrDefault();
-
-        // A self-service cancellation via the billing portal schedules the cancellation (CanceledAt
-        // gets set) but Stripe's own subscription.status stays "active" until the period actually
-        // ends - relying on MapStatus alone would silently ignore the cancellation until then. Newer
-        // API versions don't reliably set CancelAtPeriodEnd for this either, so CanceledAt being
-        // non-null is the one signal that holds regardless of how the cancellation was scheduled.
-        // Reflecting it as Canceled immediately is safe: HasActiveEntitlement already keeps a
-        // Canceled subscription's access alive through CurrentPeriodEnd. A reverted cancellation
-        // (resumed before period end) clears CanceledAt again, so this falls back to MapStatus and
-        // correctly reports Active.
-        var status = subscription.CanceledAt is not null ? SubscriptionStatus.Canceled : MapStatus(subscription.Status);
+        var (status, currentPeriodEnd) = MapSubscriptionState(subscription);
 
         return new ParsedStripeEvent(
             type,
@@ -185,7 +191,27 @@ public class StripeGateway : IStripeGateway
             subscription.Id,
             ParseUserId(subscription.Metadata),
             status,
-            periodEndItem is null ? null : new DateTimeOffset(periodEndItem.CurrentPeriodEnd, TimeSpan.Zero));
+            currentPeriodEnd);
+    }
+
+    // A self-service cancellation (via the old billing portal, the Stripe Dashboard, or our own
+    // self-serve cancel) schedules/performs the cancellation (CanceledAt gets set) but Stripe's own
+    // subscription.status can stay "active" until the period actually ends - relying on MapStatus
+    // alone would silently ignore the cancellation until then. Newer API versions don't reliably
+    // set CancelAtPeriodEnd for this either, so CanceledAt being non-null is the one signal that
+    // holds regardless of how the cancellation happened. Reflecting it as Canceled immediately is
+    // safe: HasActiveEntitlement already keeps a Canceled subscription's access alive through
+    // CurrentPeriodEnd. A reverted cancellation (resumed before period end) clears CanceledAt
+    // again, so this falls back to MapStatus and correctly reports Active. Shared by the webhook
+    // path (ParseSubscriptionEvent) and the live-reconciliation path (GetSubscriptionStateAsync) so
+    // the two can't drift apart.
+    private static (SubscriptionStatus? Status, DateTimeOffset? CurrentPeriodEnd) MapSubscriptionState(Stripe.Subscription subscription)
+    {
+        var periodEndItem = subscription.Items.Data.FirstOrDefault();
+        var status = subscription.CanceledAt is not null ? SubscriptionStatus.Canceled : MapStatus(subscription.Status);
+        DateTimeOffset? currentPeriodEnd = periodEndItem is null ? null : new DateTimeOffset(periodEndItem.CurrentPeriodEnd, TimeSpan.Zero);
+
+        return (status, currentPeriodEnd);
     }
 
     private static ParsedStripeEvent ParseInvoiceFailed(Event stripeEvent)
