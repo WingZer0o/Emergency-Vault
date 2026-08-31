@@ -21,12 +21,12 @@
 
   "tasks": {
     "build-angular:windows": "cmd /c ng build",
-    "dev": "deno task build-angular:windows && rm -rf ./emergency-vault && API_PROXY_TARGET=http://localhost:8080 ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
-    "dev:prod": "deno task build-angular:windows && rm -rf ./emergency-vault && API_PROXY_TARGET=https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
-    "desktop-build:local": "deno task build-angular:windows && rm -rf ./emergency-vault && deno run -A ./write-api-target.ts http://localhost:8080 && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
-    "desktop-build:prod": "deno task build-angular:windows && rm -rf ./emergency-vault && deno run -A ./write-api-target.ts https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
+    "dev:windows": "deno task build-angular:windows && rm -rf ./emergency-vault && API_PROXY_TARGET=http://localhost:8080 ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
+    "dev:prod:windows": "deno task build-angular:windows && rm -rf ./emergency-vault && API_PROXY_TARGET=https://api.emergencyvault.net ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
+    "desktop-build:local:windows": "deno task build-angular:windows && rm -rf ./emergency-vault && deno run -A ./write-api-target.ts http://localhost:8080 && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
+    "desktop-build:prod:windows": "deno task build-angular:windows && rm -rf ./emergency-vault && deno run -A ./write-api-target.ts https://api.emergencyvault.net && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
     "installer:windows": "ISCC.exe installer/EmergencyVault.iss",
-    "desktop-build:prod:installer:windows": "deno task build-angular:windows && deno task desktop-build:prod && deno task installer:windows"
+    "desktop-build:prod:installer:windows": "deno task build-angular:windows && deno task desktop-build:prod:windows && deno task installer:windows"
   },
   "allowScripts": {
     "allow": ["npm:@parcel/watcher@2.6.0", "npm:esbuild@0.28.2", "npm:lmdb@3.5.6", "npm:msgpackr-extract@3.0.4"]
