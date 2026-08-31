@@ -157,3 +157,11 @@ a:hover {
   margin-top: 16px;
   font-size: 14px;
 }
+
+// Toast for unhandled backend errors (error.interceptor.ts) - reuses the theme's accent
+// (red) rather than Material's default dark surface, consistent with Modernist's flat style.
+.error-snackbar {
+  --mdc-snackbar-container-color: var(--color-accent);
+  --mdc-snackbar-supporting-text-color: var(--color-bg);
+  --mat-snack-bar-button-color: var(--color-bg);
+}

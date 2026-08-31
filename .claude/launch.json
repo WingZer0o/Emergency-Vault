@@ -4,8 +4,8 @@
     {
       "name": "auth-client",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend/auth-client", "start", "--", "--port", "4201"],
-      "port": 4201
+      "runtimeArgs": ["--prefix", "frontend/auth-client", "start"],
+      "port": 4200
     }
   ]
 }

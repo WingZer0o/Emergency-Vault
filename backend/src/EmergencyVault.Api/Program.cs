@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using EmergencyVault.Api.Authorization;
+using EmergencyVault.Api.ExceptionHandling;
 using EmergencyVault.Application;
 using EmergencyVault.Application.Options;
 using EmergencyVault.Domain.Constant;
@@ -66,6 +67,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 
 builder.Services.AddRateLimiter(options =>
