@@ -188,7 +188,7 @@ jobs:
 
       - name: Compile desktop binary
         working-directory: frontend/auth-client
-        run: deno task desktop-build:prod
+        run: deno task desktop-build:prod:windows
 
       - name: Sign desktop binary
         uses: azure/artifact-signing-action@v2
