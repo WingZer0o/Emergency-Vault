@@ -21,11 +21,10 @@
 
   "tasks": {
     "build-angular:windows": "cmd /c ng build",
-    "dev": "rm -rf ./emergency-vault && API_PROXY_TARGET=http://localhost:8080 ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
-    "dev:prod": "rm -rf ./emergency-vault && API_PROXY_TARGET=https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
-    "desktop-build:local": "rm -rf ./emergency-vault && deno run -A ./write-api-target.ts http://localhost:8080 && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
-    "desktop-build:prod": "rm -rf ./emergency-vault && deno run -A ./write-api-target.ts https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
-    "desktop-build:prod:cef-test": "rm -rf ./emergency-vault && deno run -A ./write-api-target.ts https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io && deno desktop -A --backend cef --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
+    "dev": "deno task build-angular:windows && rm -rf ./emergency-vault && API_PROXY_TARGET=http://localhost:8080 ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
+    "dev:prod": "deno task build-angular:windows && rm -rf ./emergency-vault && API_PROXY_TARGET=https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io ANGULAR_DEV_SERVER=http://localhost:4200 deno desktop -A --hmr ./server.ts",
+    "desktop-build:local": "deno task build-angular:windows && rm -rf ./emergency-vault && deno run -A ./write-api-target.ts http://localhost:8080 && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
+    "desktop-build:prod": "deno task build-angular:windows && rm -rf ./emergency-vault && deno run -A ./write-api-target.ts https://ev-backend.lemonflower-3f9fde98.westus2.azurecontainerapps.io && deno desktop -A --include ./dist --include ./api-target.txt --icon ./installer/icon/app-icon.ico ./server.ts --output ./emergency-vault",
     "installer:windows": "ISCC.exe installer/EmergencyVault.iss",
     "desktop-build:prod:installer:windows": "deno task build-angular:windows && deno task desktop-build:prod && deno task installer:windows"
   },
