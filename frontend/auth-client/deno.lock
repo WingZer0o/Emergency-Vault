@@ -3084,6 +3084,10 @@
     }
   },
   "workspace": {
+    "dependencies": [
+      "jsr:@std/encoding@^1.0.11",
+      "jsr:@std/http@^1.1.3"
+    ],
     "packageJson": {
       "dependencies": [
         "npm:@angular/animations@^22.1.1",

@@ -1,4 +1,4 @@
-import { encodeBase64 } from "jsr:@std/encoding/base64";
+import { encodeBase64 } from "@std/encoding/base64";
 
 // Native clipboard bridge for ClipboardService's auto-clear (core/services/clipboard.service.ts).
 // The web Clipboard API's readText()/writeText() require live transient user activation in
@@ -82,5 +82,7 @@ export async function clearClipboardText(): Promise<void> {
   // Set-Clipboard -Value '' throws ArgumentNullException on this PowerShell (empty string binds
   // to null for this cmdlet's parameter) - verified directly. Clipboard.Clear() actually empties
   // it instead of setting empty text, and doesn't have that problem.
-  await runPowerShellHidden("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::Clear()");
+  await runPowerShellHidden(
+    "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::Clear()",
+  );
 }

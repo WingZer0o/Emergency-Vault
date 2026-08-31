@@ -1,6 +1,6 @@
-import { serveDir } from "jsr:@std/http/file-server";
+import { serveDir } from "@std/http/file-server";
 
-import { readClipboardText, writeClipboardText, clearClipboardText } from "./desktop/powershell.ts";
+import { clearClipboardText, readClipboardText, writeClipboardText } from "./desktop/powershell.ts";
 
 const DIST = `${import.meta.dirname}/dist/auth-client/browser`;
 
