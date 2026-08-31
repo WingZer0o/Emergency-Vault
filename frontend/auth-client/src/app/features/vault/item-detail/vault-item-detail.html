@@ -35,14 +35,7 @@
               >
                 <mat-icon>{{ isRevealed($index) ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
-              <button
-                mat-icon-button
-                type="button"
-                (click)="copyValue(field.value.value ?? '')"
-                aria-label="Copy value"
-              >
-                <mat-icon>content_copy</mat-icon>
-              </button>
+              <app-copy-button [value]="field.value.value ?? ''" />
             </dd>
           </div>
         }

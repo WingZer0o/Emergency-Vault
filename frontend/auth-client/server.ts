@@ -1,5 +1,7 @@
 import { serveDir } from "jsr:@std/http/file-server";
 
+import { readClipboardText, writeClipboardText, clearClipboardText } from "./desktop/powershell.ts";
+
 const DIST = `${import.meta.dirname}/dist/auth-client/browser`;
 
 // Mirrors proxy.conf.mjs's API_PROXY_TARGET convention so /api behaves the same way
@@ -178,4 +180,9 @@ Deno.serve(async (req) => {
 // a second one, giving us a handle to explicitly exit when the user actually closes it.
 // title overrides the default, which otherwise falls back to the project's package name
 // ("emergency-vault") rather than a proper display name.
-new Deno.BrowserWindow({ title: "Emergency Vault" }).addEventListener("close", () => Deno.exit(0));
+const win = new Deno.BrowserWindow({ title: "Emergency Vault" });
+win.addEventListener("close", () => Deno.exit(0));
+
+win.bind("readClipboardText", readClipboardText);
+win.bind("writeClipboardText", writeClipboardText);
+win.bind("clearClipboardText", clearClipboardText);

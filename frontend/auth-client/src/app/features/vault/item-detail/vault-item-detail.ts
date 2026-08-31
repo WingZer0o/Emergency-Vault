@@ -26,6 +26,7 @@ import { VaultItemAttachmentDto, VaultItemPayload, VaultShareDto } from '../../.
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { relativeTime } from '../../../core/utils/relative-time.util';
+import { CopyButton } from '../../../shared/copy-button/copy-button';
 import { ItemRevisionsDialog } from '../../../shared/item-revisions-dialog/item-revisions-dialog';
 import { ShareItemDialog, ShareItemDialogResult } from '../../../shared/share-item-dialog/share-item-dialog';
 import { extractErrorMessage } from '../../auth/auth-error.util';
@@ -44,7 +45,8 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
     MatButtonModule,
     MatIconModule,
     MatListModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    CopyButton
 ],
   templateUrl: './vault-item-detail.html',
   styleUrl: './vault-item-detail.scss',
@@ -154,10 +156,6 @@ export class VaultItemDetail implements OnInit {
       }
       return next;
     });
-  }
-
-  async copyValue(value: string): Promise<void> {
-    await navigator.clipboard.writeText(value);
   }
 
   startEditing(): void {

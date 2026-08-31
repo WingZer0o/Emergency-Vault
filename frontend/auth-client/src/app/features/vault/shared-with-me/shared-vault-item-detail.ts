@@ -16,6 +16,7 @@ import { DecryptedVaultItem, VaultItemAttachmentDto, VaultItemDto, VaultItemPayl
 import { VaultService } from '../../../core/services/vault.service';
 import { VaultSessionService } from '../../../core/services/vault-session.service';
 import { relativeTime } from '../../../core/utils/relative-time.util';
+import { CopyButton } from '../../../shared/copy-button/copy-button';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 import { VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
 
@@ -36,6 +37,7 @@ import { VAULT_ITEM_TYPES } from '../item-create/vault-item-create';
     MatInputModule,
     MatSelectModule,
     MatProgressSpinnerModule,
+    CopyButton,
   ],
   templateUrl: './shared-vault-item-detail.html',
   styleUrl: './shared-vault-item-detail.scss',
@@ -199,10 +201,6 @@ export class SharedVaultItemDetail implements OnInit {
       }
       return next;
     });
-  }
-
-  async copyValue(value: string): Promise<void> {
-    await navigator.clipboard.writeText(value);
   }
 
   startEditing(): void {

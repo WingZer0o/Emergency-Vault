@@ -12,12 +12,11 @@ import {
   generatePassword,
   getAlphabetSize,
 } from '../../core/crypto/password-generator.util';
-
-const COPIED_FEEDBACK_MS = 2000;
+import { CopyButton } from '../../shared/copy-button/copy-button';
 
 @Component({
   selector: 'app-password-generator',
-  imports: [MatButtonModule, MatIconModule, MatSliderModule, MatCheckboxModule, MatTooltipModule],
+  imports: [MatButtonModule, MatIconModule, MatSliderModule, MatCheckboxModule, MatTooltipModule, CopyButton],
   templateUrl: './password-generator.html',
   styleUrl: './password-generator.scss',
 })
@@ -31,7 +30,6 @@ export class PasswordGenerator {
 
   readonly password = signal('');
   readonly validationError = signal<string | null>(null);
-  readonly copied = signal(false);
 
   readonly strength = computed(() => {
     const password = this.password();
@@ -40,8 +38,6 @@ export class PasswordGenerator {
     }
     return estimatePasswordStrength(password, getAlphabetSize(this.currentOptions()));
   });
-
-  private copiedTimeout?: ReturnType<typeof setTimeout>;
 
   constructor() {
     // Regenerate whenever an option changes, so the preview on screen always matches the controls.
@@ -64,17 +60,6 @@ export class PasswordGenerator {
       this.password.set('');
       this.validationError.set(err instanceof Error ? err.message : 'Could not generate password.');
     }
-  }
-
-  async copyToClipboard(): Promise<void> {
-    if (!this.password()) {
-      return;
-    }
-
-    await navigator.clipboard.writeText(this.password());
-    this.copied.set(true);
-    clearTimeout(this.copiedTimeout);
-    this.copiedTimeout = setTimeout(() => this.copied.set(false), COPIED_FEEDBACK_MS);
   }
 
   private currentOptions(): PasswordGeneratorOptions {

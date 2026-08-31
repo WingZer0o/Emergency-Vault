@@ -83,9 +83,7 @@
                 <button mat-icon-button type="button" (click)="toggleReveal(field.name)" aria-label="Toggle visibility">
                   <mat-icon>{{ isRevealed(field.name) ? 'visibility_off' : 'visibility' }}</mat-icon>
                 </button>
-                <button mat-icon-button type="button" (click)="copyValue(field.value)" aria-label="Copy value">
-                  <mat-icon>content_copy</mat-icon>
-                </button>
+                <app-copy-button [value]="field.value" />
               </dd>
             </div>
           }
