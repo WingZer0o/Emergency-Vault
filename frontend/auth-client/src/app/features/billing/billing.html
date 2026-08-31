@@ -28,28 +28,92 @@
         </p>
         <button mat-stroked-button (click)="refresh()">Refresh status</button>
       } @else {
-        <p>
-          Access to Emergency Vault requires an active {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
-          membership.
+        <p [hidden]="checkoutOpen()">
+          Access to Emergency Vault requires an active
+          {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year membership.
         </p>
-        <button mat-flat-button color="primary" [disabled]="starting()" (click)="subscribe()">
+        <button
+          mat-flat-button
+          color="primary"
+          [hidden]="checkoutOpen()"
+          [disabled]="starting()"
+          (click)="subscribe()"
+        >
           @if (starting()) {
             <mat-progress-spinner diameter="18" mode="indeterminate" />
           } @else {
             Subscribe - {{ formatPrice(status.yearlyPriceCents, status.currency) }}/year
           }
         </button>
+
+        <div class="checkout-container" [hidden]="!checkoutOpen()" #checkoutContainer></div>
+        @if (checkoutOpen()) {
+          <button mat-stroked-button (click)="cancelCheckout()">Cancel</button>
+        }
       }
     }
 
     @if (status.hasStripeCustomer) {
-      <button mat-stroked-button [disabled]="openingPortal()" (click)="openPortal()">
-        @if (openingPortal()) {
-          <mat-progress-spinner diameter="18" mode="indeterminate" />
-        } @else {
-          Manage billing
+      <div class="manage-billing">
+        @if (paymentMethodUpdated()) {
+          <p class="hint-text">Payment method updated.</p>
         }
-      </button>
+
+        <div class="manage-billing-actions" [hidden]="managingPaymentMethod()">
+          <button
+            mat-stroked-button
+            [disabled]="updatingPaymentMethod()"
+            (click)="updatePaymentMethod()"
+          >
+            @if (updatingPaymentMethod()) {
+              <mat-progress-spinner diameter="18" mode="indeterminate" />
+            } @else {
+              Update payment method
+            }
+          </button>
+          <button
+            mat-stroked-button
+            color="warn"
+            [disabled]="canceling()"
+            (click)="cancelSubscription()"
+          >
+            @if (canceling()) {
+              <mat-progress-spinner diameter="18" mode="indeterminate" />
+            } @else {
+              Cancel membership
+            }
+          </button>
+        </div>
+
+        <div
+          class="payment-method-container"
+          [hidden]="!managingPaymentMethod()"
+          #paymentMethodContainer
+        ></div>
+        @if (managingPaymentMethod()) {
+          <div class="manage-billing-actions">
+            <button
+              mat-flat-button
+              color="primary"
+              [disabled]="updatingPaymentMethod()"
+              (click)="confirmPaymentMethod()"
+            >
+              @if (updatingPaymentMethod()) {
+                <mat-progress-spinner diameter="18" mode="indeterminate" />
+              } @else {
+                Save card
+              }
+            </button>
+            <button
+              mat-stroked-button
+              [disabled]="updatingPaymentMethod()"
+              (click)="cancelPaymentMethodUpdate()"
+            >
+              Cancel
+            </button>
+          </div>
+        }
+      </div>
     }
 
     @if (errorMessage(); as message) {

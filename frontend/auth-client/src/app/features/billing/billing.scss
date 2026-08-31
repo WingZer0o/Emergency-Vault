@@ -33,3 +33,21 @@
   display: flex;
   gap: 8px;
 }
+
+.checkout-container,
+.payment-method-container {
+  width: 100%;
+}
+
+.manage-billing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.manage-billing-actions {
+  display: flex;
+  gap: 8px;
+}

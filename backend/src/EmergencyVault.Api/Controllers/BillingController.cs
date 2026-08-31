@@ -27,20 +27,49 @@ public class BillingController(IBillingService billingService, ILogger<BillingCo
         return Ok(session);
     }
 
-    /// <summary>Stripe-hosted portal where a user can update their card or cancel, without us building either flow.</summary>
-    [HttpPost("portal-session")]
+    /// <summary>Publishable (non-secret) key the frontend needs to load Stripe.js and mount the embedded Checkout iframe.</summary>
+    [HttpGet("publishable-key")]
     [Authorize(Roles = "User")]
-    public async Task<IActionResult> CreatePortalSession([FromBody] CreatePortalSessionRequest request, CancellationToken ct)
+    public IActionResult GetPublishableKey() => Ok(billingService.GetPublishableKey());
+
+    /// <summary>Embedded (Stripe.js Payment Element) equivalent of the portal's "update card" - see IStripeGateway.CreateSetupIntentAsync for why this exists instead of Stripe's hosted Billing Portal.</summary>
+    [HttpPost("setup-intent")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> CreateSetupIntent(CancellationToken ct)
     {
         try
         {
-            var session = await billingService.CreatePortalSessionAsync(User.GetUserId(), request.IsDesktop, ct);
-            return Ok(session);
+            var intent = await billingService.CreateSetupIntentAsync(User.GetUserId(), ct);
+            return Ok(intent);
         }
         catch (InvalidOperationException)
         {
             return BadRequest(new { errors = new[] { "No billing history for this account yet." } });
         }
+    }
+
+    [HttpPost("default-payment-method")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> SetDefaultPaymentMethod([FromBody] SetDefaultPaymentMethodRequest request, CancellationToken ct)
+    {
+        try
+        {
+            await billingService.SetDefaultPaymentMethodAsync(User.GetUserId(), request.PaymentMethodId, ct);
+            return Ok();
+        }
+        catch (InvalidOperationException)
+        {
+            return BadRequest(new { errors = new[] { "No billing history for this account yet." } });
+        }
+    }
+
+    /// <summary>Self-serve cancellation - see IBillingService.CancelSubscriptionAsync for how access is kept through the already-paid period.</summary>
+    [HttpDelete("subscription")]
+    [Authorize(Roles = "User")]
+    public async Task<IActionResult> CancelSubscription(CancellationToken ct)
+    {
+        await billingService.CancelSubscriptionAsync(User.GetUserId(), ct);
+        return Ok();
     }
 
     /// <summary>

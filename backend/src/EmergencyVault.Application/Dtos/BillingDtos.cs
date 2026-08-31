@@ -12,7 +12,13 @@ public record BillingStatusDto(
     string Currency,
     bool HasStripeCustomer);
 
-public record CheckoutSessionDto(string Url);
+/// <summary>Client secret Stripe.js needs to mount an embedded Checkout iframe (see BillingService.CreateCheckoutSessionAsync) - never a URL, so there's nothing for the frontend to navigate to.</summary>
+public record EmbeddedCheckoutSessionDto(string ClientSecret);
+
+/// <summary>Client secret Stripe.js needs to mount an embedded Payment Element for updating the card on file (see BillingService.CreateSetupIntentAsync).</summary>
+public record SetupIntentDto(string ClientSecret);
+
+public record PublishableKeyDto(string PublishableKey);
 
 public record BillingSettingsDto(int YearlyPriceCents, string Currency);
 
@@ -36,4 +42,4 @@ public record SetFreeAccessRequest([Required] bool IsFreeAccess);
 // URL could.
 public record CreateCheckoutSessionRequest(bool IsDesktop);
 
-public record CreatePortalSessionRequest(bool IsDesktop);
+public record SetDefaultPaymentMethodRequest([Required] string PaymentMethodId);

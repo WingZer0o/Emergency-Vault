@@ -29,20 +29,22 @@ public class BillingService(
 
     // The compiled desktop app is a WebView2 window pointed at its own local server.ts, which
     // Deno.serve() (no explicit port passed) binds to this address by default. Sending Stripe's
-    // success/cancel/return redirect to the public DOMAIN instead would navigate that window away
-    // from the desktop app to the live marketing site, stranding the user there - see ReturnOrigin.
+    // return redirect to the public DOMAIN instead would navigate that window away from the
+    // desktop app to the live marketing site, stranding the user there - see ReturnOrigin. Only
+    // used by CreateCheckoutSessionAsync's rare redirect-required fallback now that both checkout
+    // and payment-method updates are embedded in-page instead of redirect-based.
     private const string DesktopReturnOrigin = "http://localhost:8000";
 
     // Built server-side rather than accepted from the client, to avoid an open-redirect via a
-    // caller-supplied success/cancel/return URL: the caller only picks between these two
-    // known-safe origins via the IsDesktop flag, never supplies a URL itself.
+    // caller-supplied return URL: the caller only picks between these two known-safe origins via
+    // the IsDesktop flag, never supplies a URL itself.
     private static string ReturnOrigin(bool isDesktop) =>
         isDesktop
             ? DesktopReturnOrigin
             : Environment.GetEnvironmentVariable(EnvironmentVariableConst.Domain)
                 ?? throw new InvalidOperationException("DOMAIN environment variable not set.");
 
-    public async Task<CheckoutSessionDto> CreateCheckoutSessionAsync(Guid userId, bool isDesktop, CancellationToken ct)
+    public async Task<EmbeddedCheckoutSessionDto> CreateCheckoutSessionAsync(Guid userId, bool isDesktop, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(userId.ToString())
             ?? throw new InvalidOperationException("User not found.");
@@ -58,17 +60,24 @@ public class BillingService(
             await repository.SaveChangesAsync(ct);
         }
 
-        var origin = ReturnOrigin(isDesktop);
-        var successUrl = $"{origin}/billing?success=1";
-        var cancelUrl = $"{origin}/billing?canceled=1";
+        // Only reached for a payment method that requires an out-of-band redirect (e.g. 3DS) - see
+        // the RedirectOnCompletion comment in StripeGateway.CreateCheckoutSessionAsync.
+        var returnUrl = $"{ReturnOrigin(isDesktop)}/billing?success=1";
 
-        var url = await stripeGateway.CreateCheckoutSessionUrlAsync(
-            userId, customerId, settings.YearlyPriceCents, settings.Currency, successUrl, cancelUrl, ct);
+        var clientSecret = await stripeGateway.CreateCheckoutSessionAsync(
+            userId, customerId, settings.YearlyPriceCents, settings.Currency, returnUrl, ct);
 
-        return new CheckoutSessionDto(url);
+        return new EmbeddedCheckoutSessionDto(clientSecret);
     }
 
-    public async Task<CheckoutSessionDto> CreatePortalSessionAsync(Guid userId, bool isDesktop, CancellationToken ct)
+    public PublishableKeyDto GetPublishableKey()
+    {
+        var key = Environment.GetEnvironmentVariable(EnvironmentVariableConst.StripePublishableKey)
+            ?? throw new InvalidOperationException("STRIPE_PUBLISHABLE_KEY environment variable not set.");
+        return new PublishableKeyDto(key);
+    }
+
+    public async Task<SetupIntentDto> CreateSetupIntentAsync(Guid userId, CancellationToken ct)
     {
         var subscription = await repository.GetSubscriptionAsync(userId, ct);
         if (string.IsNullOrEmpty(subscription?.StripeCustomerId))
@@ -76,9 +85,20 @@ public class BillingService(
             throw new InvalidOperationException("No billing history for this user yet.");
         }
 
-        var returnUrl = $"{ReturnOrigin(isDesktop)}/billing";
-        var url = await stripeGateway.CreatePortalSessionUrlAsync(subscription.StripeCustomerId, returnUrl, ct);
-        return new CheckoutSessionDto(url);
+        var clientSecret = await stripeGateway.CreateSetupIntentAsync(subscription.StripeCustomerId, ct);
+        return new SetupIntentDto(clientSecret);
+    }
+
+    public async Task SetDefaultPaymentMethodAsync(Guid userId, string paymentMethodId, CancellationToken ct)
+    {
+        var subscription = await repository.GetSubscriptionAsync(userId, ct);
+        if (string.IsNullOrEmpty(subscription?.StripeCustomerId))
+        {
+            throw new InvalidOperationException("No billing history for this user yet.");
+        }
+
+        await stripeGateway.SetDefaultPaymentMethodAsync(
+            subscription.StripeCustomerId, subscription.StripeSubscriptionId, paymentMethodId, ct);
     }
 
     public async Task HandleWebhookAsync(string payload, string signatureHeader, CancellationToken ct)

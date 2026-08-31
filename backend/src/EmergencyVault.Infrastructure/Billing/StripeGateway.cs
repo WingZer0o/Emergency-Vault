@@ -34,13 +34,12 @@ public class StripeGateway : IStripeGateway
         return customer.Id;
     }
 
-    public async Task<string> CreateCheckoutSessionUrlAsync(
+    public async Task<string> CreateCheckoutSessionAsync(
         Guid userId,
         string customerId,
         int unitAmountCents,
         string currency,
-        string successUrl,
-        string cancelUrl,
+        string returnUrl,
         CancellationToken ct)
     {
         var service = new SessionService();
@@ -48,8 +47,17 @@ public class StripeGateway : IStripeGateway
         {
             Mode = "subscription",
             Customer = customerId,
-            SuccessUrl = successUrl,
-            CancelUrl = cancelUrl,
+            // Stripe renamed this enum on 2026-03-25 ("embedded" -> "embedded_page"); the installed
+            // @stripe/stripe-js only exposes the post-rename stripe.createEmbeddedCheckoutPage(...)
+            // on the frontend, so the session must be created with the matching post-rename value.
+            UiMode = "embedded_page",
+            // "if_required" plus the frontend's onComplete callback keeps the whole flow inside our
+            // own page (mounted via Stripe.js) for the common case - no top-level navigation away
+            // from the app at all, which is what broke "back" navigation in the desktop app's
+            // WebView (see BillingService's DesktopReturnOrigin comment). ReturnUrl only actually
+            // gets used for the rare payment method that requires an out-of-band redirect (e.g. 3DS).
+            RedirectOnCompletion = "if_required",
+            ReturnUrl = returnUrl,
             LineItems =
             [
                 new SessionLineItemOptions
@@ -74,19 +82,42 @@ public class StripeGateway : IStripeGateway
             },
         }, cancellationToken: ct);
 
-        return session.Url;
+        return session.ClientSecret;
     }
 
-    public async Task<string> CreatePortalSessionUrlAsync(string customerId, string returnUrl, CancellationToken ct)
+    public async Task<string> CreateSetupIntentAsync(string customerId, CancellationToken ct)
     {
-        var service = new Stripe.BillingPortal.SessionService();
-        var session = await service.CreateAsync(new Stripe.BillingPortal.SessionCreateOptions
+        var service = new SetupIntentService();
+        var intent = await service.CreateAsync(new SetupIntentCreateOptions
         {
             Customer = customerId,
-            ReturnUrl = returnUrl,
+            Usage = "off_session",
+            PaymentMethodTypes = ["card"],
         }, cancellationToken: ct);
 
-        return session.Url;
+        return intent.ClientSecret;
+    }
+
+    public async Task SetDefaultPaymentMethodAsync(string customerId, string? subscriptionId, string paymentMethodId, CancellationToken ct)
+    {
+        var customerService = new CustomerService();
+        await customerService.UpdateAsync(customerId, new CustomerUpdateOptions
+        {
+            InvoiceSettings = new CustomerInvoiceSettingsOptions { DefaultPaymentMethod = paymentMethodId },
+        }, cancellationToken: ct);
+
+        // No active subscription yet (e.g. first card added before ever subscribing) - the customer
+        // default set above is still enough for the next Checkout/invoice to pick it up.
+        if (string.IsNullOrEmpty(subscriptionId))
+        {
+            return;
+        }
+
+        var subscriptionService = new SubscriptionService();
+        await subscriptionService.UpdateAsync(subscriptionId, new SubscriptionUpdateOptions
+        {
+            DefaultPaymentMethod = paymentMethodId,
+        }, cancellationToken: ct);
     }
 
     public async Task CancelSubscriptionAsync(string subscriptionId, CancellationToken ct)

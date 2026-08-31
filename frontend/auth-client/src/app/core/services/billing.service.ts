@@ -7,7 +7,9 @@ import {
   AdminSubscriptionRow,
   BillingSettings,
   BillingStatus,
-  CheckoutSessionResponse,
+  EmbeddedCheckoutSessionResponse,
+  PublishableKeyResponse,
+  SetupIntentResponse,
   UpdateBillingSettingsRequest,
 } from '../models/billing.models';
 import { isDesktopApp } from '../utils/desktop.util';
@@ -22,18 +24,29 @@ export class BillingService {
     return this.http.get<BillingStatus>(`${this.baseUrl}/status`);
   }
 
-  /** Requests a Stripe Checkout session and redirects the browser to it. */
-  startCheckout(): Observable<CheckoutSessionResponse> {
-    return this.http.post<CheckoutSessionResponse>(`${this.baseUrl}/checkout-session`, {
+  /** Requests an embedded Stripe Checkout session, mounted client-side via Stripe.js rather than a redirect. */
+  startCheckout(): Observable<EmbeddedCheckoutSessionResponse> {
+    return this.http.post<EmbeddedCheckoutSessionResponse>(`${this.baseUrl}/checkout-session`, {
       isDesktop: isDesktopApp(),
     });
   }
 
-  /** Requests a Stripe Billing Portal session (update card / cancel) and redirects the browser to it. */
-  openPortal(): Observable<CheckoutSessionResponse> {
-    return this.http.post<CheckoutSessionResponse>(`${this.baseUrl}/portal-session`, {
-      isDesktop: isDesktopApp(),
-    });
+  getPublishableKey(): Observable<PublishableKeyResponse> {
+    return this.http.get<PublishableKeyResponse>(`${this.baseUrl}/publishable-key`);
+  }
+
+  /** Requests a SetupIntent for the embedded Payment Element (update card) - see IStripeGateway.CreateSetupIntentAsync for why not Stripe's hosted Billing Portal. */
+  createSetupIntent(): Observable<SetupIntentResponse> {
+    return this.http.post<SetupIntentResponse>(`${this.baseUrl}/setup-intent`, {});
+  }
+
+  setDefaultPaymentMethod(paymentMethodId: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/default-payment-method`, { paymentMethodId });
+  }
+
+  /** Self-serve cancellation - access is kept through the already-paid period, same as the old portal's "cancel at period end". */
+  cancelSubscription(): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/subscription`);
   }
 
   getSettings(): Observable<BillingSettings> {
@@ -49,6 +62,8 @@ export class BillingService {
   }
 
   setFreeAccess(userId: string, isFreeAccess: boolean): Observable<void> {
-    return this.http.put<void>(`${this.adminBaseUrl}/subscriptions/${userId}/free-access`, { isFreeAccess });
+    return this.http.put<void>(`${this.adminBaseUrl}/subscriptions/${userId}/free-access`, {
+      isFreeAccess,
+    });
   }
 }

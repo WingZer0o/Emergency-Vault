@@ -29,20 +29,30 @@ public interface IStripeGateway
     Task<string> GetOrCreateCustomerAsync(Guid userId, string email, string? existingCustomerId, CancellationToken ct);
 
     /// <summary>
-    /// Creates a subscription-mode Checkout Session using inline price_data (yearly recurring) so
-    /// admin-configured price changes take effect immediately without syncing a Stripe Price object.
+    /// Creates a subscription-mode embedded Checkout Session using inline price_data (yearly
+    /// recurring) so admin-configured price changes take effect immediately without syncing a
+    /// Stripe Price object. "Embedded" means Stripe.js mounts the payment form as an iframe on our
+    /// own /billing page rather than redirecting the browser to a Stripe-hosted page - returns the
+    /// client secret Stripe.js needs to do that, not a URL.
     /// </summary>
-    Task<string> CreateCheckoutSessionUrlAsync(
+    Task<string> CreateCheckoutSessionAsync(
         Guid userId,
         string customerId,
         int unitAmountCents,
         string currency,
-        string successUrl,
-        string cancelUrl,
+        string returnUrl,
         CancellationToken ct);
 
-    /// <summary>Creates a Stripe Billing Portal session so the customer can update their card or cancel, without us building either flow ourselves.</summary>
-    Task<string> CreatePortalSessionUrlAsync(string customerId, string returnUrl, CancellationToken ct);
+    /// <summary>
+    /// Creates a SetupIntent so the customer can securely add a new card via an embedded Stripe.js
+    /// Payment Element, without us ever handling raw card data. Returns the client secret the
+    /// frontend needs to mount it - Stripe's hosted Billing Portal (the alternative) can't be
+    /// embedded in an iframe at all, which is why this exists instead of reusing that.
+    /// </summary>
+    Task<string> CreateSetupIntentAsync(string customerId, CancellationToken ct);
+
+    /// <summary>Makes the given payment method the default for future invoices on the customer and, if present, their active subscription.</summary>
+    Task SetDefaultPaymentMethodAsync(string customerId, string? subscriptionId, string paymentMethodId, CancellationToken ct);
 
     /// <summary>Cancels a Stripe subscription immediately (not at period end) so no further charges occur.</summary>
     Task CancelSubscriptionAsync(string subscriptionId, CancellationToken ct);
