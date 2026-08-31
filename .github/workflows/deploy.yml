@@ -137,7 +137,7 @@ jobs:
       needs.frontend_tests.result == 'success' &&
       (needs.deploy_backend.result == 'success' || needs.deploy_backend.result == 'skipped')
     runs-on: windows-latest
-    name: Build Desktop Installer
+    name: Build Desktop Installer - Windows
     permissions:
       contents: write # job-level override: needs to create a tag + release, unlike the rest of the workflow
       id-token: write # needed for the OIDC azure/login step below (job-level permissions replace, not merge, the workflow defaults)
