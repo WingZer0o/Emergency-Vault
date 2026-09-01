@@ -15,6 +15,7 @@ public interface IAuthService
     Task<ServiceResult> UnlockAccountAsync(Guid userId, string token, CancellationToken ct);
     Task<ServiceResult> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct);
     Task<ServiceResult> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct);
+    Task<ServiceResult> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct);
     Task<UserProfileDto?> GetProfileAsync(Guid userId, CancellationToken ct);
     Task<TwoFactorStatusResult> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct);
     Task<ServiceResult<TwoFactorActivationResult>> EnableTwoFactorAsync(Guid userId, CancellationToken ct);

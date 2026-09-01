@@ -33,6 +33,12 @@ public record VaultRewrapDto(
     [Required] string NewPrivateKeyWrappedByMasterKey,
     string? NewMlKemSecretKeyWrappedByMasterKey);
 
+/// <summary>Changes only the account sign-in password. The vault, if any, has its own independent
+/// password and is changed separately via POST /api/vault/recover - see VaultController.</summary>
+public record ChangePasswordRequest(
+    [Required] string CurrentPassword,
+    [Required, MinLength(8)] string NewPassword);
+
 public record UserProfileDto(Guid Id, string Email, string FirstName, string LastName, IReadOnlyList<string> Roles);
 
 public record AuthResult(

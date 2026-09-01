@@ -127,6 +127,20 @@
   margin: 0 0 8px;
 }
 
+.change-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 420px;
+
+  .actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+}
+
 .totp-setup {
   margin-top: 16px;
   padding-top: 16px;

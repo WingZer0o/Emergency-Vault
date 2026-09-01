@@ -80,6 +80,12 @@ export interface ResetPasswordRequest {
   vaultRewrap?: VaultRecoverRequest;
 }
 
+/** Changes only the account sign-in password. The vault (if any) has its own independent password, changed separately via VaultService.recover(). */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface ApiErrorBody {
   errors?: string[];
   message?: string;

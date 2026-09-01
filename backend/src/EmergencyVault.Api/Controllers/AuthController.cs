@@ -134,6 +134,16 @@ public class AuthController(IAuthService authService) : ControllerBase
             : BadRequest(new { errors = result.Errors });
     }
 
+    [HttpPost("change-password")]
+    [Authorize(Roles="User")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
+    {
+        var result = await authService.ChangePasswordAsync(User.GetUserId(), request, ct);
+        return result.Succeeded
+            ? Ok(new { message = "Password changed successfully." })
+            : BadRequest(new { errors = result.Errors });
+    }
+
     [HttpGet("me")]
     [Authorize(Roles="User")]
     public async Task<IActionResult> Me(CancellationToken ct)

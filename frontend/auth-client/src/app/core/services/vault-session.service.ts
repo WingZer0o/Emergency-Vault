@@ -185,6 +185,39 @@ export class VaultSessionService {
     await this.persistSession(privateKey, uvk, mlKemSecretKey);
   }
 
+  /**
+   * Changes the vault's own password - independent of the account sign-in password. Unwraps the
+   * private key (and ML-KEM secret key, if this vault has one) using the Master Key derived from
+   * the *current* vault password, re-wraps them under a fresh Master Key derived from the *new*
+   * vault password, and persists the new wrapping via /vault/recover. Rejects with a GCM
+   * auth-tag mismatch if currentPassword is wrong - callers should treat any rejection here as
+   * "current vault password is incorrect" and not touch the account password at all.
+   */
+  async changeVaultPassword(currentPassword: string, newPassword: string): Promise<void> {
+    const bundle = await firstValueFrom(this.vaultService.getUnlockBundle());
+    const currentMasterKey = await deriveMasterKey(currentPassword, bundle.kdfSalt, bundle.kdfIterations);
+    const privateKey = await unwrapPrivateKey(bundle.privateKeyWrappedByMasterKey, currentMasterKey, true);
+    const mlKemSecretKey = bundle.mlKemSecretKeyWrappedByMasterKey
+      ? await unwrapRawBytes(bundle.mlKemSecretKeyWrappedByMasterKey, currentMasterKey)
+      : null;
+
+    const newKdfSalt = generateSaltBase64();
+    const newMasterKey = await deriveMasterKey(newPassword, newKdfSalt, DEFAULT_KDF_ITERATIONS);
+    const newPrivateKeyWrappedByMasterKey = await wrapPrivateKey(privateKey, newMasterKey);
+    const newMlKemSecretKeyWrappedByMasterKey = mlKemSecretKey
+      ? await wrapRawBytes(mlKemSecretKey, newMasterKey)
+      : undefined;
+
+    await firstValueFrom(
+      this.vaultService.recover({
+        newKdfSalt,
+        newKdfIterations: DEFAULT_KDF_ITERATIONS,
+        newPrivateKeyWrappedByMasterKey,
+        newMlKemSecretKeyWrappedByMasterKey,
+      }),
+    );
+  }
+
   /** Unwraps a UVK that was wrapped for this user as an emergency-access recipient, not their own vault. Non-extractable - a holder never needs to re-share someone else's vault. */
   async unwrapSharedUvk(wrappedUvk: string): Promise<CryptoKey> {
     const privateKey = this.privateKeySig();

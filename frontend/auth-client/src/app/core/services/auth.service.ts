@@ -5,6 +5,7 @@ import { Observable, catchError, finalize, map, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   AuthResponse,
+  ChangePasswordRequest,
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
@@ -126,6 +127,10 @@ export class AuthService {
 
   resetPassword(request: ResetPasswordRequest): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/reset-password`, request);
+  }
+
+  changePassword(request: ChangePasswordRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/change-password`, request);
   }
 
   /** Called once at app bootstrap to silently restore a session from the refresh cookie, if any. */

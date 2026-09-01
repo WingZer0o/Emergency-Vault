@@ -124,6 +124,107 @@
   </section>
 
   <section class="profile-section">
+    <h2>Sign-in password</h2>
+    <p class="section-intro">Change the password you use to sign in.</p>
+
+    <form [formGroup]="changePasswordForm" (ngSubmit)="submitChangePassword()" class="change-password-form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Current password</mat-label>
+        <input matInput type="password" formControlName="currentPassword" autocomplete="current-password" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>New password</mat-label>
+        <input matInput type="password" formControlName="newPassword" autocomplete="new-password" />
+        @if (changePasswordForm.controls.newPassword.hasError('minlength')) {
+          <mat-error>Password must be at least 8 characters.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Confirm new password</mat-label>
+        <input matInput type="password" formControlName="confirmNewPassword" autocomplete="new-password" />
+        @if (changePasswordForm.hasError('passwordMismatch') && changePasswordForm.controls.confirmNewPassword.touched) {
+          <mat-error>Passwords do not match.</mat-error>
+        }
+      </mat-form-field>
+
+      @if (passwordChangeError(); as message) {
+        <p class="error-text">{{ message }}</p>
+      }
+      @if (passwordChangeSuccess()) {
+        <p class="success-text">Password changed successfully.</p>
+      }
+
+      <div class="actions">
+        <span></span>
+        <button mat-flat-button color="primary" type="submit" [disabled]="passwordChangeSaving()">
+          @if (passwordChangeSaving()) {
+            <mat-progress-spinner diameter="20" mode="indeterminate" />
+          } @else {
+            Change password
+          }
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="profile-section">
+    <h2>Vault password</h2>
+    @if (hasVault()) {
+      <p class="section-intro">
+        Separate from your sign-in password - this is what unlocks your encrypted vault. Changing
+        it here re-encrypts your vault key without needing your recovery key.
+      </p>
+
+      <form [formGroup]="vaultPasswordChangeForm" (ngSubmit)="submitChangeVaultPassword()" class="change-password-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Current vault password</mat-label>
+          <input matInput type="password" formControlName="currentVaultPassword" autocomplete="current-password" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>New vault password</mat-label>
+          <input matInput type="password" formControlName="newVaultPassword" autocomplete="new-password" />
+          @if (vaultPasswordChangeForm.controls.newVaultPassword.hasError('minlength')) {
+            <mat-error>Password must be at least 8 characters.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Confirm new vault password</mat-label>
+          <input matInput type="password" formControlName="confirmNewVaultPassword" autocomplete="new-password" />
+          @if (vaultPasswordChangeForm.hasError('passwordMismatch') && vaultPasswordChangeForm.controls.confirmNewVaultPassword.touched) {
+            <mat-error>Passwords do not match.</mat-error>
+          }
+        </mat-form-field>
+
+        @if (vaultPasswordChangeError(); as message) {
+          <p class="error-text">{{ message }}</p>
+        }
+        @if (vaultPasswordChangeSuccess()) {
+          <p class="success-text">Vault password changed successfully.</p>
+        }
+
+        <div class="actions">
+          <a routerLink="/vault/recover">Lost access to your vault?</a>
+          <button mat-flat-button color="primary" type="submit" [disabled]="vaultPasswordChangeSaving()">
+            @if (vaultPasswordChangeSaving()) {
+              <mat-progress-spinner diameter="20" mode="indeterminate" />
+            } @else {
+              Change vault password
+            }
+          </button>
+        </div>
+      </form>
+    } @else {
+      <p class="hint-text">
+        You haven't set up a vault yet. <a routerLink="/vault/setup">Set one up</a> to store encrypted secrets.
+      </p>
+    }
+  </section>
+
+  <section class="profile-section">
     <h3>Holders</h3>
     @if (holders().length === 0) {
       <p class="hint-text">No one has emergency access to your vault yet.</p>

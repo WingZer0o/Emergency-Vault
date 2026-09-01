@@ -594,6 +594,23 @@ public class AuthService(
         return ServiceResult.Success();
     }
 
+    public async Task<ServiceResult> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return ServiceResult.Failure("User not found.");
+        }
+
+        var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            return ServiceResult.Failure(result.Errors.Select(e => e.Description).ToArray());
+        }
+
+        return ServiceResult.Success();
+    }
+
     public async Task<ServiceResult> DeleteAccountAsync(Guid userId, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());

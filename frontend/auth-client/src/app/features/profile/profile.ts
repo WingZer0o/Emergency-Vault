@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioChange, MatRadioModule } from '@angular/material/radio';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,6 +16,18 @@ import { VaultShareDto, VaultShareStatus } from '../../core/models/vault.models'
 import { MatButtonModule } from '@angular/material/button';
 import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { extractErrorMessage } from '../auth/auth-error.util';
+
+function passwordsMatchValidator(control: AbstractControl): ValidationErrors | null {
+  const password = control.get('newPassword')?.value;
+  const confirmPassword = control.get('confirmNewPassword')?.value;
+  return password === confirmPassword ? null : { passwordMismatch: true };
+}
+
+function vaultPasswordsMatchValidator(control: AbstractControl): ValidationErrors | null {
+  const password = control.get('newVaultPassword')?.value;
+  const confirmPassword = control.get('confirmNewVaultPassword')?.value;
+  return password === confirmPassword ? null : { passwordMismatch: true };
+}
 
 @Component({
   selector: 'app-profile',
@@ -70,9 +82,39 @@ export class Profile implements OnInit {
   readonly deleteInProgress = signal(false);
   readonly deleteError = signal<string | null>(null);
 
+  readonly passwordChangeSaving = signal(false);
+  readonly passwordChangeError = signal<string | null>(null);
+  readonly passwordChangeSuccess = signal(false);
+
+  readonly changePasswordForm = this.fb.nonNullable.group(
+    {
+      currentPassword: ['', [Validators.required]],
+      newPassword: ['', [Validators.required, Validators.minLength(8)]],
+      confirmNewPassword: ['', [Validators.required]],
+    },
+    { validators: passwordsMatchValidator },
+  );
+
+  /** Whether this account has a vault at all - the vault password section only makes sense if so. */
+  readonly hasVault = signal(false);
+
+  readonly vaultPasswordChangeSaving = signal(false);
+  readonly vaultPasswordChangeError = signal<string | null>(null);
+  readonly vaultPasswordChangeSuccess = signal(false);
+
+  readonly vaultPasswordChangeForm = this.fb.nonNullable.group(
+    {
+      currentVaultPassword: ['', [Validators.required]],
+      newVaultPassword: ['', [Validators.required, Validators.minLength(8)]],
+      confirmNewVaultPassword: ['', [Validators.required]],
+    },
+    { validators: vaultPasswordsMatchValidator },
+  );
+
   ngOnInit(): void {
     this.loadTwoFactorStatus();
     this.loadHolders();
+    this.loadVaultStatus();
   }
 
   signInMethodLabel(): string {
@@ -101,6 +143,14 @@ export class Profile implements OnInit {
     this.vaultService.getShares().subscribe({
       next: (shares) => this.holders.set(shares),
       // Non-critical - manage-holders is still fully usable at /vault/sharing if this fails.
+      error: () => {},
+    });
+  }
+
+  private loadVaultStatus(): void {
+    this.vaultService.getStatus().subscribe({
+      next: (status) => this.hasVault.set(status.hasVault),
+      // Non-critical - the vault password section just stays hidden if this fails.
       error: () => {},
     });
   }
@@ -266,6 +316,54 @@ export class Profile implements OnInit {
       },
       error: () => this.twoFactorLoading.set(false),
     });
+  }
+
+  submitChangePassword(): void {
+    if (this.changePasswordForm.invalid) {
+      this.changePasswordForm.markAllAsTouched();
+      return;
+    }
+
+    this.passwordChangeSaving.set(true);
+    this.passwordChangeError.set(null);
+    this.passwordChangeSuccess.set(false);
+
+    const { currentPassword, newPassword } = this.changePasswordForm.getRawValue();
+    this.authService.changePassword({ currentPassword, newPassword }).subscribe({
+      next: () => {
+        this.passwordChangeSaving.set(false);
+        this.passwordChangeSuccess.set(true);
+        this.changePasswordForm.reset();
+      },
+      error: (err) => {
+        this.passwordChangeSaving.set(false);
+        this.passwordChangeError.set(extractErrorMessage(err, 'Could not change password. Please try again.'));
+      },
+    });
+  }
+
+  submitChangeVaultPassword(): void {
+    if (this.vaultPasswordChangeForm.invalid) {
+      this.vaultPasswordChangeForm.markAllAsTouched();
+      return;
+    }
+
+    this.vaultPasswordChangeSaving.set(true);
+    this.vaultPasswordChangeError.set(null);
+    this.vaultPasswordChangeSuccess.set(false);
+
+    const { currentVaultPassword, newVaultPassword } = this.vaultPasswordChangeForm.getRawValue();
+    this.vaultSession
+      .changeVaultPassword(currentVaultPassword, newVaultPassword)
+      .then(() => {
+        this.vaultPasswordChangeSaving.set(false);
+        this.vaultPasswordChangeSuccess.set(true);
+        this.vaultPasswordChangeForm.reset();
+      })
+      .catch(() => {
+        this.vaultPasswordChangeSaving.set(false);
+        this.vaultPasswordChangeError.set('Current vault password is incorrect.');
+      });
   }
 
   public onDeleteProfile(): void {
