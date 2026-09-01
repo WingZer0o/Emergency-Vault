@@ -15,6 +15,7 @@ import { TwoFactorMethodName } from '../../core/models/auth.models';
 import { VaultShareDto, VaultShareStatus } from '../../core/models/vault.models';
 import { MatButtonModule } from '@angular/material/button';
 import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
+import { passwordStrengthValidators } from '../../core/utils/password-strength.util';
 import { extractErrorMessage } from '../auth/auth-error.util';
 
 function passwordsMatchValidator(control: AbstractControl): ValidationErrors | null {
@@ -89,7 +90,7 @@ export class Profile implements OnInit {
   readonly changePasswordForm = this.fb.nonNullable.group(
     {
       currentPassword: ['', [Validators.required]],
-      newPassword: ['', [Validators.required, Validators.minLength(8)]],
+      newPassword: ['', passwordStrengthValidators],
       confirmNewPassword: ['', [Validators.required]],
     },
     { validators: passwordsMatchValidator },
@@ -105,7 +106,7 @@ export class Profile implements OnInit {
   readonly vaultPasswordChangeForm = this.fb.nonNullable.group(
     {
       currentVaultPassword: ['', [Validators.required]],
-      newVaultPassword: ['', [Validators.required, Validators.minLength(8)]],
+      newVaultPassword: ['', passwordStrengthValidators],
       confirmNewVaultPassword: ['', [Validators.required]],
     },
     { validators: vaultPasswordsMatchValidator },

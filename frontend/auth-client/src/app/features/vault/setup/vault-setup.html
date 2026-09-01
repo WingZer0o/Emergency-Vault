@@ -14,6 +14,8 @@
             <input matInput type="password" formControlName="password" autocomplete="current-password" />
             @if (form.controls.password.hasError('required')) {
               <mat-error>Password is required.</mat-error>
+            } @else if (form.controls.password.hasError('pattern')) {
+              <mat-error>Password must be at least 10 characters and include an uppercase letter and a special character.</mat-error>
             }
           </mat-form-field>
 

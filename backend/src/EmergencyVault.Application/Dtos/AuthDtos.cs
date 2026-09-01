@@ -3,9 +3,19 @@ using EmergencyVault.Domain.Enums;
 
 namespace EmergencyVault.Application.Dtos;
 
+/// <summary>Shared account-password strength rule: at least 10 characters, one uppercase letter,
+/// one special (non-alphanumeric) character. Kept in sync with the Identity options in
+/// EmergencyVault.Infrastructure.DependencyInjection, which is what actually enforces it -
+/// these attributes just surface a clearer 400 before that point.</summary>
+internal static class PasswordRules
+{
+    public const string Pattern = @"^(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{10,}$";
+    public const string ErrorMessage = "Password must be at least 10 characters and include an uppercase letter and a special character.";
+}
+
 public record RegisterRequest(
     [Required, EmailAddress] string Email,
-    [Required, MinLength(8)] string Password,
+    [Required, RegularExpression(PasswordRules.Pattern, ErrorMessage = PasswordRules.ErrorMessage)] string Password,
     [Required] string FirstName,
     [Required] string LastName);
 
@@ -18,7 +28,7 @@ public record ForgotPasswordRequest([Required, EmailAddress] string Email);
 public record ResetPasswordRequest(
     [Required] Guid UserId,
     [Required] string Token,
-    [Required, MinLength(8)] string NewPassword,
+    [Required, RegularExpression(PasswordRules.Pattern, ErrorMessage = PasswordRules.ErrorMessage)] string NewPassword,
     VaultRewrapDto? VaultRewrap = null);
 
 /// <summary>
@@ -37,7 +47,7 @@ public record VaultRewrapDto(
 /// password and is changed separately via POST /api/vault/recover - see VaultController.</summary>
 public record ChangePasswordRequest(
     [Required] string CurrentPassword,
-    [Required, MinLength(8)] string NewPassword);
+    [Required, RegularExpression(PasswordRules.Pattern, ErrorMessage = PasswordRules.ErrorMessage)] string NewPassword);
 
 public record UserProfileDto(Guid Id, string Email, string FirstName, string LastName, IReadOnlyList<string> Roles);
 

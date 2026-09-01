@@ -20,6 +20,7 @@ import {
 import { VaultRecoverRequest } from '../../../core/models/vault.models';
 import { AuthService } from '../../../core/services/auth.service';
 import { VaultService } from '../../../core/services/vault.service';
+import { passwordStrengthValidators } from '../../../core/utils/password-strength.util';
 import { extractErrorMessage } from '../auth-error.util';
 
 function passwordsMatchValidator(control: AbstractControl): ValidationErrors | null {
@@ -64,7 +65,7 @@ export class ResetPassword implements OnInit {
 
   readonly form = this.fb.nonNullable.group(
     {
-      newPassword: ['', [Validators.required, Validators.minLength(8)]],
+      newPassword: ['', passwordStrengthValidators],
       confirmPassword: ['', [Validators.required]],
       recoveryKey: [''],
     },

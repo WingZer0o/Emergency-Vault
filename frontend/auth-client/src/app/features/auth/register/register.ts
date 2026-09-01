@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { AuthService } from '../../../core/services/auth.service';
+import { passwordStrengthValidators } from '../../../core/utils/password-strength.util';
 import { extractErrorMessage } from '../auth-error.util';
 
 function passwordsMatchValidator(control: AbstractControl): ValidationErrors | null {
@@ -43,7 +44,7 @@ export class Register {
       firstName: ['', [Validators.required]],
       lastName: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(8)]],
+      password: ['', passwordStrengthValidators],
       confirmPassword: ['', [Validators.required]],
     },
     { validators: passwordsMatchValidator },

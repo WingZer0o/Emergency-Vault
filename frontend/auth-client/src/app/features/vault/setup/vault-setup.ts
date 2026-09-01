@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 
 import { VaultSessionService } from '../../../core/services/vault-session.service';
+import { passwordStrengthValidators } from '../../../core/utils/password-strength.util';
 import { extractErrorMessage } from '../../auth/auth-error.util';
 
 @Component({
@@ -36,7 +37,7 @@ export class VaultSetup {
   readonly savedConfirmed = signal(false);
 
   readonly form = this.fb.nonNullable.group({
-    password: ['', [Validators.required]],
+    password: ['', passwordStrengthValidators],
   });
 
   submit(): void {

@@ -30,8 +30,8 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Password</mat-label>
             <input matInput type="password" formControlName="password" autocomplete="new-password" />
-            @if (form.controls.password.hasError('minlength')) {
-              <mat-error>Password must be at least 8 characters.</mat-error>
+            @if (form.controls.password.hasError('pattern')) {
+              <mat-error>Password must be at least 10 characters and include an uppercase letter and a special character.</mat-error>
             }
           </mat-form-field>
 
